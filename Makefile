@@ -4,7 +4,8 @@ PY    := $(VENV)/bin/python
 
 .DEFAULT_GOAL := help
 .PHONY: help setup install up down logs migrate seed backend-dev frontend-dev \
-        test test-backend test-frontend lint typecheck smoke verify-providers fake-providers
+        test test-backend test-frontend lint typecheck smoke verify-providers fake-providers \
+        worker fake-research
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -36,6 +37,12 @@ seed: ## Load development sample CVEs (flagged as unverified seed data)
 
 backend-dev: ## Run the API with auto-reload on :8000
 	cd backend && ../$(VENV)/bin/uvicorn app.main:app --reload --port 8000
+
+worker: ## Run the research worker (learning-guide generation); needs REDIS_URL and RESEARCH_JOB_BACKEND=rq
+	cd backend && ../$(PY) -m app.workers.research_worker
+
+fake-research: ## Research worker on a FICTIONAL web (dev only; FAKE_LLM=malicious for a hostile model). Needs fake-providers
+	cd backend && ../$(PY) ../scripts/fake_research.py
 
 frontend-dev: ## Run the web app on :3000
 	cd frontend && npm run dev

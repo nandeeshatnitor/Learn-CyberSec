@@ -1,0 +1,123 @@
+{
+  "cve": {
+    "id": "CVE-2099-12345",
+    "sourceIdentifier": "security@acme-vendor.test",
+    "published": "2099-01-02T10:00:00.000",
+    "lastModified": "2099-01-05T12:00:00.000",
+    "vulnStatus": "Analyzed",
+    "cveTags": [],
+    "descriptions": [
+      {
+        "lang": "en",
+        "value": "AcmeDocs 4.0.0 through 4.2.3 evaluates expressions from the X-Template-Hint request header, allowing remote code execution when the preview feature is enabled."
+      }
+    ],
+    "metrics": {
+      "cvssMetricV31": [
+        {
+          "source": "nvd@nist.gov",
+          "type": "Primary",
+          "cvssData": {
+            "version": "3.1",
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            "baseScore": 9.8,
+            "baseSeverity": "CRITICAL"
+          }
+        }
+      ]
+    },
+    "weaknesses": [
+      {
+        "source": "nvd@nist.gov",
+        "type": "Primary",
+        "description": [
+          {
+            "lang": "en",
+            "value": "CWE-94"
+          }
+        ]
+      }
+    ],
+    "configurations": [
+      {
+        "nodes": [
+          {
+            "operator": "OR",
+            "negate": false,
+            "cpeMatch": [
+              {
+                "vulnerable": true,
+                "criteria": "cpe:2.3:a:acme:acmedocs:*:*:*:*:*:*:*:*",
+                "versionStartIncluding": "4.0.0",
+                "versionEndExcluding": "4.2.4",
+                "matchCriteriaId": "F1"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "references": [
+      {
+        "url": "https://advisories.acme-vendor.test/ACME-SA-2099-01",
+        "source": "security@acme-vendor.test",
+        "tags": [
+          "Vendor Advisory",
+          "Patch"
+        ]
+      },
+      {
+        "url": "https://blog.example-security.test/2099/dissecting-cve-2099-12345",
+        "source": "security@acme-vendor.test",
+        "tags": []
+      },
+      {
+        "url": "https://mirror.example-syndication.test/dissecting-cve-2099-12345",
+        "source": "security@acme-vendor.test",
+        "tags": []
+      },
+      {
+        "url": "https://cert.example-cert.test/vuls/id/990099",
+        "source": "security@acme-vendor.test",
+        "tags": [
+          "Third Party Advisory"
+        ]
+      },
+      {
+        "url": "https://lists.example-oss.test/oss-security/2099/01/02/1",
+        "source": "security@acme-vendor.test",
+        "tags": []
+      },
+      {
+        "url": "https://exploit-db.example.test/exploits/99001",
+        "source": "security@acme-vendor.test",
+        "tags": []
+      },
+      {
+        "url": "https://blog.example-security.test/2099/unrelated-post",
+        "source": "security@acme-vendor.test",
+        "tags": []
+      },
+      {
+        "url": "https://news.example-security.test/weekly-roundup",
+        "source": "security@acme-vendor.test",
+        "tags": []
+      },
+      {
+        "url": "https://evil.example-attacker.test/analysis-of-cve-2099-12345",
+        "source": "security@acme-vendor.test",
+        "tags": []
+      },
+      {
+        "url": "https://notes.example-attacker.test/quick-notes",
+        "source": "security@acme-vendor.test",
+        "tags": []
+      },
+      {
+        "url": "https://private.example-blocked.test/cve-2099-12345",
+        "source": "security@acme-vendor.test",
+        "tags": []
+      }
+    ]
+  }
+}

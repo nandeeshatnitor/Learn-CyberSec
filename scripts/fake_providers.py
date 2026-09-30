@@ -44,6 +44,10 @@ def make_handler(kind: str, state: dict):  # type: ignore[no-untyped-def,type-ar
     nvd_records = {v["cve"]["id"]: v["cve"] for v in nvd_search["vulnerabilities"]} | {
         "CVE-2021-44228": nvd_single["cve"]
     }
+    # A fictional CVE whose references point at the fictional web used by scripts/fake_research.py.
+    fictional = FIXTURES / "research" / "nvd_cve_2099_12345.json"
+    if fictional.exists():
+        nvd_records["CVE-2099-12345"] = json.loads(fictional.read_text())["cve"]
     mitre = {"CVE-2021-44228": load("mitre_cve_2021_44228.json")}
     kev = load("kev_catalog.json")
 

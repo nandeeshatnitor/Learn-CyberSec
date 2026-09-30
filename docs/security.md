@@ -21,6 +21,25 @@ their own descriptions. Design rules and how they are met:
 | HTTP hardening | API: `nosniff`, `X-Frame-Options: DENY`, `CSP: default-src 'none'`, `no-store`; CORS GET-only for configured origins; docs disabled in production. Frontend: CSP, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`. |
 | Containers | Non-root users; ports published on `127.0.0.1` only. |
 
+## Phase 2: retrieving and summarising third-party web content
+
+Full design in [research.md](research.md#trust-boundary-external-content--data-only). Summary of the
+controls and where they are tested:
+
+| Requirement | How it is handled |
+| --- | --- |
+| Treat all retrieved content as untrusted; never execute it | Only text is parsed. Nothing is evaluated, rendered, executed, shelled out or downloaded as a file; proof-of-concept scripts are dropped; the UI has no run button and shows commands as inert text. |
+| SSRF from the crawler | `PublicWebFetcher`: http(s) on 80/443 only, no userinfo, IP-literal and internal hostnames refused, every resolved address must be public (IPv4-in-IPv6, mixed answers), the connection is pinned to the validated address, redirects are re-validated hop by hop (max 3), a fresh cookie-less client per request. Tested against loopback, link-local/metadata, RFC 1918, CGNAT, IPv6 forms, credentials, odd ports, redirects to internal hosts and DNS answers that turn private. |
+| Respect sites | `robots.txt` per RFC 9309, `Crawl-delay`, per-host spacing shared across workers, size/time limits, text content types only, a declared user agent. |
+| Resource exhaustion from hostile pages | Byte cap while streaming, deadlines, page shape bounded *before* building a tree (a 20,000-deep nesting took minutes; it is now refused instantly), tag-count cap, passage and source budgets. |
+| Prompt injection in web pages | Hidden text/comments isolated and screened; suspicious passages withheld; pages with hidden AI-addressed instructions excluded; Unicode/look-alike normalisation. **This is defence in depth only.** The boundary is structural: fixed system prompt, evidence as escaped JSON data, no tools, schema-constrained output, and re-verification of every claim (below). |
+| A model that obeys an injection | `validate_and_ground` removes claims without a valid citation, with details found in no source, unrelated to their citations, or instruction-like; withholds commands that are not verbatim from a source, pipe into interpreters, are destructive or target non-local hosts; drops model-written limitations that address the reader. Tested with a fake model that follows every hostile page, at unit level and end to end through the real queue, database and UI. |
+| Unsupported claims shown as fact | Evidence levels and confidence are computed by the platform, never taken from the model; missing sections and an unestablished reproduction are stated, not filled. |
+| Credentials | `ANTHROPIC_API_KEY`/`GITHUB_TOKEN` are backend/worker `SecretStr`s: never in responses, logs, the queue (only a run ID travels) or the frontend; the GitHub token is only sent to `api.github.com`; provider error text is never surfaced. |
+| Cost and abuse | Per-IP and daily limits on new runs, one active run per CVE, cache reuse, refresh cooldown, stale-run reaper; status polling has its own budget. |
+| Browser → backend | Same-origin Next.js route handlers only: cross-site POSTs refused (`Sec-Fetch-Site`/`Origin`), only a sanitised `X-Forwarded-For` forwarded (no cookies or Authorization), a fixed set of statuses and error fields passed through, everything else becomes a generic 503. |
+| Scope of advice | Reproduction is framed and enforced as local / intentionally vulnerable / authorized-lab only; third-party targets are removed or withheld. |
+
 ## Trust and provenance (integrity of what users are told)
 
 * Data is presented as *retrieved from* a named source, never as verified by this platform.
@@ -44,3 +63,9 @@ their own descriptions. Design rules and how they are met:
 * DNS rebinding of an allow-listed provider hostname to an internal address is not blocked at the
   socket level; egress filtering at the network layer is recommended in production.
 * Pin container image digests and add dependency/vulnerability scanning in CI before release.
+* **The research worker's SSRF defence is application-level.** Also restrict the worker's network
+  egress (deny private ranges and cloud metadata endpoints) in production.
+* **Claim validation is lexical** (see [research.md](research.md#what-validation-cannot-do)): it cannot
+  prove a paraphrase is faithful. Every claim shows the excerpt it rests on.
+* Phase 2 has not been run against the live web or the live Anthropic API in development (no network
+  or key); it is tested with mock transports and fake models.

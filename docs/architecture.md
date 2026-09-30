@@ -1,10 +1,12 @@
 # Architecture
 
 ```
-Browser ──► Next.js (server components) ──► FastAPI ──► PostgreSQL  (stored copies, Phase 0 tables)
-                                               │
-                                               ├──► Redis         (provider cache, rate limits)
-                                               └──► NVD · MITRE/CVE Program · CISA KEV  (public APIs)
+Browser ──► Next.js (server components + route handlers) ──► FastAPI ──► PostgreSQL  (stored copies, research runs)
+                                                               │
+                                                               ├──► Redis         (provider cache, rate limits, job queue)
+                                                               ├──► NVD · MITRE/CVE Program · CISA KEV  (public APIs)
+                                                               └──► Redis queue ──► research worker ──► public web pages, GitHub API,
+                                                                                                        (optional) Anthropic API
 ```
 
 The browser only ever talks to Next.js. Server components call the API using `BACKEND_URL`
@@ -22,7 +24,8 @@ need for cross-origin calls; CORS is nonetheless locked to configured origins, G
 | Cache | `app/cache/` | Redis / in-memory cache, fresh + stale envelope, sliding-window rate limiter, per-key locks. |
 | Repositories | `app/repositories/` | All SQL. Nothing else touches the session. |
 | Models / Schemas | `app/models/`, `app/schemas/` | ORM tables vs. the normalised, provider-independent API contracts. |
-| Workers | `app/workers/` | Background jobs on Redis (none needed yet). |
+| Research | `app/research/` | The learning-guide pipeline: discovery, SSRF-safe fetching, extraction, injection screening, de-duplication, relevance, evidence packs, synthesis and validation. See [research.md](research.md). |
+| Workers | `app/workers/` | Job queue abstraction (RQ / thread / inline), the research job, the worker entry point. |
 | Config / DB / Utils | `app/config/`, `app/database/`, `app/utils/` | Settings, engine/session, logging, sanitisers and helpers. |
 
 Dependencies point downwards only: API → services → integrations/repositories → models/schemas.
@@ -48,6 +51,15 @@ core CVE model, the API or the cache.
 cache (CISA KEV downloads a whole catalogue) are marked `self_managed` so budgets and breaker trials
 are not double-counted.
 
+## Learning-guide research
+
+`POST /api/cves/{id}/research` creates a `research_runs` row (state *and* cache) and enqueues only its
+ID. A worker (`python -m app.workers.research_worker`, the `worker` compose service) runs
+`ResearchRunner`: look up the CVE record, `ResearchPipeline.gather` → `EvidencePack`, store source
+metadata and excerpts, `build_guide` (LLM or extractive synthesis, then `validate_and_ground`), store
+the guide. The browser polls a same-origin status route; the worker is the only component that fetches
+third-party pages. Details, trust boundary and limits: [research.md](research.md).
+
 ## Adding services later
 
 `services/` is reserved for standalone deployable units (for example an ingestion worker or a
@@ -61,6 +73,8 @@ App Router, all data fetching in server components. `/cves` (search: filters, pa
 empty and error states, provider-status banner) and `/cves/[cveId]` (Overview, Severity, CVSS,
 Affected software, Affected versions, Weakness, Known exploitation status, References, Sources).
 Sections without data render as visibly "Not available"; sections with data name their source.
+The Learning guide section is a client component (`components/research/`) that starts research through
+same-origin route handlers (`app/api/cves/[cveId]/research`), polls, and renders the guide.
 `loading.tsx` files provide streaming skeletons. Untrusted text is only ever rendered through React
 (escaped), and links only through `SafeLink` (http/https only).
 

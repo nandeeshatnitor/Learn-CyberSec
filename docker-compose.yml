@@ -20,6 +20,15 @@ x-backend-env: &backend-env
   API_RATE_LIMIT_WINDOW_SECONDS: ${API_RATE_LIMIT_WINDOW_SECONDS:-60}
   # The web app (a private-network peer) forwards each visitor's address in X-Forwarded-For.
   TRUSTED_PROXIES: ${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+  # Learning-guide research (phase 2). Keys stay in the backend and worker containers only.
+  RESEARCH_ENABLED: ${RESEARCH_ENABLED:-true}
+  RESEARCH_SYNTHESIS: ${RESEARCH_SYNTHESIS:-auto}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  RESEARCH_MODEL: ${RESEARCH_MODEL:-claude-opus-5-5}
+  GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+  RESEARCH_JOB_BACKEND: rq
+  RESEARCH_PER_IP_RUNS_PER_HOUR: ${RESEARCH_PER_IP_RUNS_PER_HOUR:-5}
+  RESEARCH_DAILY_RUN_BUDGET: ${RESEARCH_DAILY_RUN_BUDGET:-200}
 
 services:
   db:
@@ -75,6 +84,22 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  # Research worker: retrieves public web pages and builds learning guides. It is the only
+  # component that fetches arbitrary third-party URLs (with SSRF checks, robots.txt and rate
+  # limits), so give it restricted egress in production: see docs/research.md.
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.workers.research_worker"]
+    environment: *backend-env
+    healthcheck:
+      disable: true  # the image's health check probes the API port, which a worker does not serve
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:

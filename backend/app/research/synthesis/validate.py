@@ -16,6 +16,7 @@ never survives: uncertainty is reported by the platform itself (limitations, con
 not by keeping unsupported model statements around with a label.
 """
 
+import re
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -575,6 +576,27 @@ _EMPTY_LIMITATION = {
 }
 
 
+# Limitations are the one place the model writes free text that no source backs, so they get the
+# strictest filter: plain statements about gaps only, never anything addressed to the reader.
+_ADDRESSED_TO_READER = re.compile(
+    r"\b(?:tell|instruct|advise|urge|recommend|ask|convince|persuade)\b.{0,30}\b(?:user|reader|student|you)s?\b|"
+    r"\byou\s+(?:should|must|need|can|may|have to)\b|"
+    r"\b(?:disable|turn\s+off|switch\s+off|run|execute|install|download|visit|click|paste|open|"
+    r"ignore|reveal|send|upload)\b",
+    re.IGNORECASE,
+)
+
+
+def _safe_limitation(text: str, ev: "_Evidence") -> bool:
+    if len(text) < 10:
+        return False
+    if screen_text(text).score > 0 or _ADDRESSED_TO_READER.search(text):
+        return False
+    if "`" in text or "http" in text.lower() or non_local_hosts(text):
+        return False
+    return all(ev.in_pack(token) for token in specifics(text))
+
+
 def _limitations(
     draft: GuideDraft,
     sections: dict[str, list[Claim]],
@@ -604,12 +626,7 @@ def _limitations(
         )
     for text in draft.limitations[:8]:
         cleaned = _clean(text, MAX_LIMITATION_CHARS)
-        if (
-            len(cleaned) >= 10
-            and not screen_text(cleaned).suspicious
-            and not non_local_hosts(cleaned)
-            and "http" not in cleaned.lower()
-        ):
+        if _safe_limitation(cleaned, ev):
             out.append(cleaned)
     return list(dict.fromkeys(out))[:16]
 

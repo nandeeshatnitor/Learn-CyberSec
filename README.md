@@ -7,7 +7,7 @@ reproduce it in an authorised local lab, and how to fix it.
 > **Educational use only.** Only test systems you own or have explicit written permission to
 > test. Everything from external sources is treated as untrusted input.
 
-## Status: Phase 1 (authoritative vulnerability data)
+## Status: Phase 2 (source-cited learning guides)
 
 You can open the site, search for a CVE (by ID, part of an ID, keyword, product or vendor), open
 it, and see metadata retrieved from **NVD**, **MITRE / CVE Program** and the **CISA KEV
@@ -16,9 +16,20 @@ status, dates and the original references. Every section says which source it ca
 site says that it *retrieved* the data and did *not independently verify* it. If one provider is
 down the site keeps working with the others (and with cached or stored copies, labelled as such).
 
-**Not implemented yet (later phases):** learning guides / LLM-generated content, reproduction
-guides, hints, sandbox labs, users and progress. Those sections show as "Not available". See
-[docs/roadmap.md](docs/roadmap.md) and [docs/providers.md](docs/providers.md).
+**Learning guides (phase 2).** On a CVE page, **Generate Learning Guide** researches public sources
+(vendor and CERT advisories, GitHub advisories, write-ups, Exploit-DB pages) in a background job and
+builds a structured guide: what it is, why it happens, affected versions, prerequisites, a local lab
+reproduction where the sources support one, what to observe, impact, remediation and references.
+Every statement cites its sources and carries an evidence level; where the sources are silent the
+guide says so instead of guessing. Retrieved web content is treated strictly as data: nothing is
+executed, and a language model (optional) only rewrites evidence that is then re-checked in code. See
+[docs/research.md](docs/research.md).
+
+**Not implemented yet (later phases):** hints, sandbox labs, users and progress. Those sections show
+as "Not available". See [docs/roadmap.md](docs/roadmap.md) and [docs/providers.md](docs/providers.md).
+
+> **Guides work without an API key.** With no `ANTHROPIC_API_KEY` the guide is assembled from
+> verbatim excerpts of the sources. Set the key (backend/worker only) for model-written guides.
 
 > **Verify against the real APIs.** The automated tests use hand-written fixtures and never touch
 > the network; the adapters were built without access to the live services. Run
@@ -36,11 +47,12 @@ backend/          FastAPI, Pydantic, SQLAlchemy, Alembic
   app/cache/        Redis cache, sliding-window rate limiter, in-process fallbacks
   app/repositories/ database access
   app/models/       ORM models       app/schemas/  normalised, provider-independent schemas
-  app/workers/      background jobs (empty until needed)
+  app/research/     research pipeline: discovery, safe fetching, extraction, screening, synthesis, validation
+  app/workers/      RQ queue, research job and worker entry point
 services/         future standalone services (see services/README.md)
 infrastructure/   deployment/infra assets
 docs/             architecture, providers, data model, security, roadmap
-scripts/          helper scripts (env setup, live provider check, fake providers)
+scripts/          helper scripts (env setup, live provider check, fake providers, fake research web)
 tests/            cross-service smoke test
 ```
 
@@ -50,7 +62,7 @@ Requires Docker with Compose v2.
 
 ```bash
 make setup      # creates .env with freshly generated passwords (never commit it)
-make up         # postgres, redis, migrations, backend, frontend
+make up         # postgres, redis, migrations, backend, research worker, frontend
 ```
 
 - Web app: http://localhost:3000
@@ -84,6 +96,12 @@ NVD/MITRE/KEV APIs on localhost; the values to put in `.env` are in `scripts/fak
 `make seed` loads a few hand-entered sample CVEs that are shown only as a last-resort fallback,
 clearly labelled "Development sample record".
 
+Learning guides offline: with the fake providers running, `make fake-research` starts the research
+worker on a *fictional* web (the real pipeline, queue and database; only the network is replaced), and
+`/cves/CVE-2099-12345` then generates a complete guide. `FAKE_LLM=malicious make fake-research` plays
+a model that obeys the hostile pages, to show that none of it reaches the guide. See
+[docs/research.md](docs/research.md#running-it).
+
 ## Tests and checks
 
 ```bash
@@ -112,6 +130,9 @@ REDIS_TEST_URL=redis://:pass@localhost:6379/0 make test-backend
 | GET | `/api/health/providers` | Active probe of NVD / MITRE / KEV (cached 60 s). One failing provider does not make the API unhealthy. |
 | GET | `/api/cves/{cve_id}` | Normalised record from all providers, merged, with attribution. 404 unknown, 422 malformed, 503 no provider reachable and no stored copy. |
 | GET | `/api/cves/search?q=&page=&limit=&severity=&known_exploited=` | Exact ID, partial ID, keyword, product, vendor. `severity` = LOW/MEDIUM/HIGH/CRITICAL, `known_exploited=true` = CISA KEV only. |
+| POST | `/api/cves/{cve_id}/research` | Start (or join, or reuse) learning-guide research. Body `{"refresh": false}`. 202 queued, 200 joined/reused, 404 unknown CVE, 429 per-client or daily limit, 503 disabled or queue down. |
+| GET | `/api/cves/{cve_id}/research/status` | `not_started / queued / researching / synthesizing / ready / failed`, counts, versions, error. Poll this. |
+| GET | `/api/cves/{cve_id}/research` | The stored guide (every claim with evidence level and citations), sources used, and what happened to every other source. 404 until a guide exists. |
 | GET | `/api/sources/{source_id}` | Stored source by UUID. |
 
 Response shape (abridged):
