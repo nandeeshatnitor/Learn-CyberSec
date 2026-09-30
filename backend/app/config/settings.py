@@ -117,6 +117,24 @@ class Settings(BaseSettings):
     # Optional. Raises GitHub's API rate limit; only ever sent to api.github.com.
     github_token: SecretStr | None = None
 
+    # --- Interactive learning sessions (phase 3) ------------------------------------------------
+    learning_enabled: bool = True
+    # Scoring is intentionally simple and configurable; it is copied into each session at start.
+    learning_start_score: int = Field(default=100, ge=1, le=10_000)
+    learning_hint1_penalty: int = Field(default=5, ge=0, le=1000)
+    learning_hint2_penalty: int = Field(default=10, ge=0, le=1000)
+    learning_hint3_penalty: int = Field(default=15, ge=0, le=1000)
+    learning_solution_penalty: int = Field(default=30, ge=0, le=1000)
+    # Pedagogy: a solution can only be revealed after the student has tried the task once.
+    learning_solution_requires_attempt: bool = True
+    learning_max_answer_chars: int = Field(default=1000, ge=50, le=10_000)
+    learning_max_question_chars: int = Field(default=500, ge=20, le=5_000)
+    # Cost/abuse limits for the AI tutor (each question can be a model call).
+    learning_tutor_per_session_per_hour: int = Field(default=30, ge=1)
+    learning_tutor_per_client_per_hour: int = Field(default=60, ge=1)
+    learning_sessions_per_client_per_hour: int = Field(default=20, ge=1)
+    learning_read_rate_limit_requests: int = Field(default=240, ge=1)  # per minute per client
+
     @field_validator("redis_url", "nvd_api_key", "anthropic_api_key", "github_token", mode="before")
     @classmethod
     def _empty_secret_is_unset(cls, value: object) -> object:

@@ -40,7 +40,7 @@ TEXT = (
 )
 
 
-# -- de-duplication ---------------------------------------------------------------
+# -- de-duplication --------------------------------------------------------------------
 def docs(*texts: str, weights: tuple[float, ...] | None = None) -> list[DocumentFingerprint]:
     weights = weights or (1.0,) * len(texts)
     return [DocumentFingerprint(text=t, weight=w) for t, w in zip(texts, weights, strict=True)]

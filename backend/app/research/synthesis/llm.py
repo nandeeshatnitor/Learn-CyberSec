@@ -16,13 +16,17 @@ point, but these structural rules are what the design relies on.
 
 import json
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
+
+from pydantic import BaseModel
 
 from app.research.evidence import EvidencePack
 from app.research.synthesis.schema import GuideDraft
 from app.utils.logging import get_logger
 
 log = get_logger(__name__)
+
+_T = TypeVar("_T", bound=BaseModel)
 
 SYSTEM_PROMPT = """\
 You write structured learning guides about publicly documented software vulnerabilities for a \
@@ -152,12 +156,28 @@ class AnthropicStructuredLLM:
         self._effort = effort
 
     def generate(self, *, system: str, user: str) -> LLMResult:
-        try:
-            return self._generate_once(system, user)
-        except LLMInvalidOutput:
-            return self._generate_once(system, user)  # one retry: a malformed reply is rare
+        parsed, model, usage = self._with_retry(system, user, GuideDraft)
+        return LLMResult(
+            draft=parsed,
+            model=model,
+            input_tokens=getattr(usage, "input_tokens", None),
+            output_tokens=getattr(usage, "output_tokens", None),
+        )
 
-    def _generate_once(self, system: str, user: str) -> LLMResult:
+    def generate_tutor(self, *, system: str, user: str) -> Any:
+        """The AI tutor's structured reply (schema imported lazily: it lives with the tutor)."""
+        from app.learning.tutor import TutorDraft, TutorResult
+
+        parsed, model, _ = self._with_retry(system, user, TutorDraft)
+        return TutorResult(draft=parsed, model=model)
+
+    def _with_retry(self, system: str, user: str, schema: type[_T]) -> tuple[_T, str, Any]:
+        try:
+            return self._generate_once(system, user, schema)
+        except LLMInvalidOutput:
+            return self._generate_once(system, user, schema)  # one retry: a malformed reply is rare
+
+    def _generate_once(self, system: str, user: str, schema: type[_T]) -> tuple[_T, str, Any]:
         anthropic = self._anthropic
         try:
             response = self._client.messages.parse(
@@ -165,7 +185,7 @@ class AnthropicStructuredLLM:
                 max_tokens=self._max_tokens,
                 system=system,
                 messages=[{"role": "user", "content": user}],
-                output_format=GuideDraft,
+                output_format=schema,
                 output_config={"effort": self._effort},
             )
         except anthropic.APIStatusError as exc:
@@ -182,13 +202,11 @@ class AnthropicStructuredLLM:
             raise LLMRefused("model declined")
         if stop_reason == "max_tokens":
             raise LLMTruncated("output limit reached")
-        draft = getattr(response, "parsed_output", None)
-        if not isinstance(draft, GuideDraft):
+        parsed = getattr(response, "parsed_output", None)
+        if not isinstance(parsed, schema):
             raise LLMInvalidOutput("no parsed output")
-        usage = getattr(response, "usage", None)
-        return LLMResult(
-            draft=draft,
-            model=str(getattr(response, "model", self._model)),
-            input_tokens=getattr(usage, "input_tokens", None),
-            output_tokens=getattr(usage, "output_tokens", None),
+        return (
+            parsed,
+            str(getattr(response, "model", self._model)),
+            getattr(response, "usage", None),
         )

@@ -13,6 +13,7 @@ from app.models import ResearchRun, ResearchRunSource, Source
 from app.models.enums import ResearchStatus, SourceStatus
 from app.repositories import ResearchRepository
 from app.research.pipeline import ResearchPipeline
+from app.research.version import GENERATION_VERSION
 from app.services import (
     InvalidInputError,
     NotFoundError,
@@ -41,7 +42,7 @@ def runs(db: Session) -> list[ResearchRun]:
     return list(db.execute(select(ResearchRun)).scalars())
 
 
-# -- starting ----------------------------------------------------------------------------------
+# -- starting --------------------------------------------------------------------------
 def test_request_queues_a_run(service: ResearchService, queue: RecordingQueue, db: Session) -> None:
     status, started = service.request(CVE_ID, client_key=CLIENT)
     assert started
@@ -95,7 +96,7 @@ def test_unavailable_queue_fails_the_run_and_does_not_block_retries(
     assert started and status.status == "queued"
 
 
-# -- abuse limits ---------------------------------------------------------------------------------
+# -- abuse limits ----------------------------------------------------------------------
 def test_per_client_limit(
     make_service: Callable[..., ResearchService], repo: ResearchRepository
 ) -> None:
@@ -133,7 +134,7 @@ def test_joining_or_reusing_does_not_spend_budget(
         assert not started  # joined the active run: no error, nothing spent
 
 
-# -- executing, caching ---------------------------------------------------------------------------
+# -- executing, caching ----------------------------------------------------------------
 def test_worker_builds_and_stores_the_guide(
     service: ResearchService, queue: RecordingQueue, db: Session
 ) -> None:
@@ -143,7 +144,11 @@ def test_worker_builds_and_stores_the_guide(
     assert status.status == "ready" and status.guide_available
     assert status.synthesis_method == "extractive" and status.model_version is None
     assert status.source_count >= 3 and status.sources_discovered >= 10
-    assert status.started_at and status.completed_at and status.generation_version == "1"
+    assert (
+        status.started_at
+        and status.completed_at
+        and status.generation_version == GENERATION_VERSION
+    )
     assert status.poll_after_seconds is None
     assert status.run_id == started.run_id
 
@@ -216,7 +221,7 @@ def test_expired_or_outdated_guides_are_regenerated(
     assert started
     queue.drain()
 
-    newer = make_service(policy=ResearchPolicy(generation_version="2"))
+    newer = make_service(policy=ResearchPolicy(generation_version="99"))
     _, started = newer.request(CVE_ID, client_key=CLIENT)
     assert started  # a new pipeline/prompt version invalidates cached guides
     assert len(runs(db)) == 3
@@ -245,7 +250,7 @@ def test_only_one_active_run_per_cve_at_the_database_level(
     assert len(runs(db)) == 1
 
 
-# -- the runner ------------------------------------------------------------------------------------
+# -- the runner ------------------------------------------------------------------------
 def test_runner_reports_progress_stages(
     repo: ResearchRepository, make_runner: Callable[..., ResearchRunner], web
 ) -> None:
@@ -338,7 +343,7 @@ def test_llm_guide_is_stored_with_its_model_version(
     assert status.synthesis_method == "llm" and status.model_version == "fake-model-1"
 
 
-# -- reading ---------------------------------------------------------------------------------------
+# -- reading ---------------------------------------------------------------------------
 def test_status_before_any_research(service: ResearchService) -> None:
     status = service.status(CVE_ID)
     assert status.status == "not_started" and not status.guide_available and status.run_id is None

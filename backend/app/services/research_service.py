@@ -176,6 +176,8 @@ class ResearchService:
                 f"The stored learning guide for {cve_id} is outdated; generate it again."
             ) from exc
         base = self._status_of(ready, cve_id)
+        if guide.challenge is not None:  # answers, hints and solutions never go to a browser
+            guide = guide.model_copy(update={"challenge": guide.challenge.redacted()})
         return ResearchGuideResponse(
             **base.model_dump(),
             guide=guide,

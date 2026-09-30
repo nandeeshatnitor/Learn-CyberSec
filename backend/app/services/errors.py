@@ -45,3 +45,17 @@ class ResearchUnavailableError(DomainError):
     """The job could not be queued (no worker/queue reachable)."""
 
     code = "research_unavailable"
+
+
+class ConflictError(DomainError):
+    """The request is valid but not allowed in the resource's current state."""
+
+    code = "conflict"
+
+
+class UnauthorizedError(DomainError):
+    code = "unauthorized"
+
+
+class LearningDisabledError(DomainError):
+    code = "learning_disabled"

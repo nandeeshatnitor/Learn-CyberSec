@@ -36,7 +36,7 @@ def failed(fetcher: PublicWebFetcher, url: str) -> str:
     return caught.value.code
 
 
-# -- happy path and request hygiene ------------------------------------------------------
+# -- happy path and request hygiene ----------------------------------------------------
 def test_fetches_text_with_a_declared_user_agent(web: FakeWeb) -> None:
     result = make_fetcher(web).fetch(URL)
     assert b"hello advisory" in result.body
@@ -80,7 +80,7 @@ def test_every_request_uses_a_fresh_client_so_no_cookies_persist(web: FakeWeb) -
     assert all(c is None for c in cookies) and clients == len(cookies)
 
 
-# -- destinations that must never be contacted -------------------------------------------
+# -- destinations that must never be contacted -----------------------------------------
 @pytest.mark.parametrize(
     ("url", "code"),
     [
@@ -139,7 +139,7 @@ def test_resolution_failure_is_reported_not_raised_raw(web: FakeWeb) -> None:
     assert blocked(make_fetcher(web, resolver=broken), URL) == "dns_failure"
 
 
-# -- redirects ---------------------------------------------------------------------------
+# -- redirects -------------------------------------------------------------------------
 def test_redirect_to_an_internal_address_is_not_followed(web: FakeWeb) -> None:
     web.add(URL, Page("", status=302, headers={"location": "http://127.0.0.1:8080/admin"}))
     assert blocked(make_fetcher(web), URL) == "ip_literal_host"
@@ -178,7 +178,7 @@ def test_redirect_without_a_location_fails(web: FakeWeb) -> None:
     assert failed(make_fetcher(web), URL) == "bad_redirect"
 
 
-# -- robots.txt --------------------------------------------------------------------------
+# -- robots.txt ------------------------------------------------------------------------
 def test_robots_disallow_is_honoured_without_fetching_the_page(web: FakeWeb) -> None:
     web.add(
         "https://docs.example-vendor.test/robots.txt",
@@ -226,7 +226,7 @@ def test_robots_can_only_be_skipped_when_explicitly_configured(web: FakeWeb) -> 
     assert make_fetcher(web, respect_robots=False).fetch(URL).body
 
 
-# -- content limits ----------------------------------------------------------------------
+# -- content limits --------------------------------------------------------------------
 @pytest.mark.parametrize("mime", ["application/pdf", "image/png", "application/zip", "video/mp4"])
 def test_only_text_content_types_are_accepted(web: FakeWeb, mime: str) -> None:
     web.add(URL, Page(b"data", mime))
@@ -295,7 +295,7 @@ def test_total_deadline_stops_slow_downloads(web: FakeWeb) -> None:
     assert failed(fetcher, URL) == "timeout"
 
 
-# -- politeness --------------------------------------------------------------------------
+# -- politeness ------------------------------------------------------------------------
 def test_requests_to_one_host_are_spaced_out(web: FakeWeb) -> None:
     web.add("https://docs.example-vendor.test/second", "<p>2</p>")
     sleeps: list[float] = []

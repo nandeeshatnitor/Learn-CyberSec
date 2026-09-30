@@ -250,7 +250,7 @@ def test_job_runs_end_to_end_with_real_providers(
         assert stored.guide["sources"], "provider records still ground the guide"
 
 
-# -- real Redis + RQ (skipped unless REDIS_TEST_URL is set) ----------------------------------------
+# -- real Redis + RQ (skipped unless REDIS_TEST_URL is set) ----------------------------
 REDIS_TEST_URL = os.environ.get("REDIS_TEST_URL")
 
 
@@ -298,3 +298,15 @@ def test_rq_round_trip_through_a_real_worker(
     finally:
         connection.delete(f"rq:queue:{queue_name}")
         connection.close()
+
+
+def test_the_guide_endpoint_never_returns_answers_hints_or_solutions(
+    research_client: TestClient, queue: RecordingQueue
+) -> None:
+    research_client.post(f"/api/cves/{CVE_ID}/research")
+    queue.drain()
+    challenge = research_client.get(f"/api/cves/{CVE_ID}/research").json()["guide"]["challenge"]
+    assert challenge["tasks"] and challenge["learning_objectives"]
+    for task in challenge["tasks"]:
+        assert task["prompt"] and task["verification_criteria"]
+        assert task["key_points"] == [] and task["hints"] == [] and task["solution"] == []

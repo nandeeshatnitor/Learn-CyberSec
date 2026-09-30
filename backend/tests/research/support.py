@@ -198,7 +198,7 @@ def fictional_record(
     )
 
 
-# -- evidence packs ------------------------------------------------------------------------------
+# -- evidence packs --------------------------------------------------------------------
 def gather_pack(*, urls: list[str] | None = None, web: FakeWeb | None = None) -> EvidencePack:
     from app.research.discovery.references import ReferenceDiscoverer
     from app.research.pipeline import ResearchPipeline

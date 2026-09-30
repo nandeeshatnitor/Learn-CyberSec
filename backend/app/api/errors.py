@@ -10,13 +10,16 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.schemas import ErrorBody, ErrorResponse
 from app.services import (
+    ConflictError,
     DomainError,
     InvalidInputError,
+    LearningDisabledError,
     NotFoundError,
     ProvidersUnavailableError,
     RateLimitedError,
     ResearchDisabledError,
     ResearchUnavailableError,
+    UnauthorizedError,
 )
 from app.utils.logging import get_logger
 
@@ -29,6 +32,9 @@ _DOMAIN_STATUS = {
     RateLimitedError: 429,
     ResearchDisabledError: 503,
     ResearchUnavailableError: 503,
+    ConflictError: 409,
+    UnauthorizedError: 401,
+    LearningDisabledError: 503,
 }
 
 

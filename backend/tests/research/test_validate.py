@@ -132,7 +132,7 @@ def test_control_and_bidi_characters_are_stripped(pack: EvidencePack) -> None:
     assert "‮" not in g.remediation[0].text and "\x00" not in g.remediation[0].text
 
 
-# -- reproduction ----------------------------------------------------------------------------------
+# -- reproduction ----------------------------------------------------------------------
 def repro(**kwargs: object) -> DraftReproduction:
     base: dict[str, object] = {
         "feasible": "yes",
@@ -234,7 +234,7 @@ def test_unverified_caption_of_a_real_command_is_not_a_reproduction(pack: Eviden
     assert g.reproduction.status == "not_established"
 
 
-# -- confidence -----------------------------------------------------------------------------------
+# -- confidence ------------------------------------------------------------------------
 def test_confidence_is_computed_and_capped(pack: EvidencePack) -> None:
     p = find_passage(pack, "Upgrade to AcmeDocs 4.2.4 or later")
     g = guide(empty_draft(remediation=[claim("Upgrade to AcmeDocs 4.2.4 or later.", p)]), pack)

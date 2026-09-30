@@ -12,6 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.learning.schema import Challenge
 from app.models.enums import ReliabilityLevel, SourceType
 
 EvidenceLevel = Literal["DOCUMENTED", "SUPPORTED_BY_MULTIPLE_SOURCES", "SYNTHESIZED", "UNCERTAIN"]
@@ -161,6 +162,7 @@ class LearningGuide(_Model):
     remediation: list[Claim] = Field(default_factory=list)
     confidence: Confidence
     limitations: list[str] = Field(default_factory=list)
+    challenge: Challenge | None = None  # interactive tasks; served to browsers only redacted
     sources: list[SourceCitation] = Field(default_factory=list)
     evidence: list[EvidencePassage] = Field(default_factory=list)
     generation: GuideGeneration

@@ -57,6 +57,8 @@ known-third-party = ["alembic"]  # not the local ./alembic migrations directory
 "app/research/injection.py" = ["E501"]
 "app/research/facets.py" = ["E501"]
 "app/research/classify.py" = ["E501"]
+# Prompt/hint wording tables and word lists.
+"app/learning/*.py" = ["E501", "SIM905"]
 
 [tool.mypy]
 python_version = "3.11"

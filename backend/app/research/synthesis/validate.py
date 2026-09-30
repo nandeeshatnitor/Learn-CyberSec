@@ -18,7 +18,7 @@ not by keeping unsupported model statements around with a label.
 
 import re
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -110,10 +110,13 @@ class _Grounded:
 class _Evidence:
     """Lookup structures over the evidence pack."""
 
-    def __init__(self, pack: EvidencePack) -> None:
+    def __init__(
+        self, pack: EvidencePack | None = None, *, sources: Sequence[EvidenceSource] = ()
+    ) -> None:
         self.pack = pack
-        self.sources: dict[str, EvidenceSource] = {s.sid: s for s in pack.sources}
-        self.passages: dict[str, Passage] = {p.id: p for p in pack.passages()}
+        listed = list(pack.sources) if pack is not None else list(sources)
+        self.sources: dict[str, EvidenceSource] = {s.sid: s for s in listed}
+        self.passages: dict[str, Passage] = {p.id: p for s in listed for p in s.passages}
         self._norm: dict[str, str] = {pid: normalise(p.text) for pid, p in self.passages.items()}
         self._all_text = " \n ".join(self._norm.values())
 
@@ -585,7 +588,7 @@ _ADDRESSED_TO_READER = re.compile(
 )
 
 
-def _safe_limitation(text: str, ev: "_Evidence") -> bool:
+def safe_free_text(text: str, ev: "_Evidence") -> bool:
     if len(text) < 10:
         return False
     if screen_text(text).score > 0 or _ADDRESSED_TO_READER.search(text):
@@ -604,6 +607,8 @@ def _limitations(
     tally: _Tally,
 ) -> list[str]:
     out: list[str] = []
+    if ev.pack is None:
+        return out
     stats = ev.pack.stats
     if not any(s.kind == "document" for s in ev.pack.sources):
         out.append(
@@ -624,7 +629,7 @@ def _limitations(
         )
     for text in draft.limitations[:8]:
         cleaned = _clean(text, MAX_LIMITATION_CHARS)
-        if _safe_limitation(cleaned, ev):
+        if safe_free_text(cleaned, ev):
             out.append(cleaned)
     return list(dict.fromkeys(out))[:16]
 
@@ -731,3 +736,23 @@ def validate_and_ground(
         ),
         validation=summary,
     )
+
+
+# -- reuse outside guide generation (the AI tutor grounds its answers the same way) ----------------
+EvidenceIndex = _Evidence
+Grounded = _Grounded
+
+
+def ground_claim(
+    ev: _Evidence,
+    text: str,
+    source_ids: list[str],
+    passage_ids: list[str],
+    basis: str,
+    *,
+    limit: int = MAX_CLAIM_CHARS,
+) -> tuple[_Grounded | None, list[str]]:
+    """Check one statement against evidence: (grounded claim or None, issue codes)."""
+    tally = _Tally()
+    grounded = _ground(ev, text, source_ids, passage_ids, basis, tally, limit=limit)
+    return grounded, sorted(tally.issues)

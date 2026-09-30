@@ -49,7 +49,7 @@ class FakeLLM:
         return LLMResult(draft=self.draft, model="fake-model-1")
 
 
-# -- what the model is sent ------------------------------------------------------------------------
+# -- what the model is sent ------------------------------------------------------------
 def test_system_prompt_is_constant_and_carries_no_retrieved_text(pack: EvidencePack) -> None:
     system, user = build_messages(pack)
     assert system == SYSTEM_PROMPT
@@ -89,7 +89,7 @@ def test_hostile_titles_cannot_break_out_of_the_json_document(pack: EvidencePack
     assert "‮" not in user and "\n\nSYSTEM" not in user.partition("\n\n")[2]
 
 
-# -- what survives when the model obeys a hostile page --------------------------------------------
+# -- what survives when the model obeys a hostile page ---------------------------------
 def obedient_draft(pack: EvidencePack) -> GuideDraft:
     """What a fully compromised model would write after reading the injection pages."""
     good = find_passage(pack, "Upgrade to AcmeDocs 4.2.4 or later")
@@ -188,7 +188,7 @@ def test_no_llm_configured_is_reported_not_hidden(pack: EvidencePack) -> None:
     assert guide.generation.model_version is None
 
 
-# -- the Anthropic adapter ------------------------------------------------------------------------
+# -- the Anthropic adapter -------------------------------------------------------------
 class FakeMessages:
     def __init__(self, outcomes: list[object]) -> None:
         self.outcomes = outcomes

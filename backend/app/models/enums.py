@@ -62,3 +62,13 @@ class DataOrigin(enum.StrEnum):
 
     SEED = "seed"  # hand-entered development fixture, NOT retrieved from an authority
     PROVIDERS = "providers"  # retrieved from external providers (NVD, MITRE, CISA KEV, ...)
+
+
+class LearningStatus(enum.StrEnum):
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
+
+
+ACTIVE_LEARNING_STATUSES = (LearningStatus.NOT_STARTED, LearningStatus.IN_PROGRESS)
