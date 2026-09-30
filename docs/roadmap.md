@@ -9,7 +9,9 @@
 | 2b | More discovery: general web search, vendor feeds, mailing-list archives; nonce-based CSP; worker egress policy | planned |
 | 3 | Interactive learning: sessions, progressive hints, answer checking, AI tutor, scoring, `/learn/[cveId]` (see [learning.md](learning.md)) | **done** (anonymous learners; not exercised against the live Anthropic API) |
 | 3b | Accounts and cross-device progress (`User`), richer answer grading | planned |
-| 4 | Isolated sandbox labs (`LabDefinition`, `LabAttempt`) in `services/` | planned |
+| 4 | Sandboxed labs: lab templates, Docker runtime, per-lab isolated network with a fail-closed isolation proof, instance lifecycle + reset + cleanup worker, browser terminal gateway, behaviour-based verifier, progress in learning sessions, demo lab (see [sandbox.md](sandbox.md)) | **done** (Docker required; tested on real Docker) |
+| 4b | More labs (real CVE reproductions built by the team), multi-container labs, egress allow-lists, VM/gVisor-backed runtimes, a separately deployed sandbox service | planned |
 
-Not implemented: user accounts, sandbox labs. Reproduction *guidance* is phase 2; nothing
-is ever executed by the platform.
+Not implemented: user accounts, labs for arbitrary CVEs. Reproduction *guidance* is phase 2; the platform executes
+nothing from retrieved content. The only thing it ever runs is a repository-defined lab, in a sealed container
+(phase 4, [sandbox.md](sandbox.md)).

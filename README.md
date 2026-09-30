@@ -7,7 +7,7 @@ reproduce it in an authorised local lab, and how to fix it.
 > **Educational use only.** Only test systems you own or have explicit written permission to
 > test. Everything from external sources is treated as untrusted input.
 
-## Status: Phase 3 (interactive learning)
+## Status: Phase 4 (sandboxed labs)
 
 You can open the site, search for a CVE (by ID, part of an ID, keyword, product or vendor), open
 it, and see metadata retrieved from **NVD**, **MITRE / CVE Program** and the **CISA KEV
@@ -33,8 +33,17 @@ words and get feedback that never hands you the answer; ask for up to three prog
 hints (a small, configurable score cost) or the solution; ask the tutor, whose answers cite their sources
 and say so when the sources are silent. See [docs/learning.md](docs/learning.md).
 
-**Not implemented yet (later phases):** sandbox labs and user accounts (learners are anonymous, identified
-by a cookie). Those parts show as "Not available". See [docs/roadmap.md](docs/roadmap.md) and [docs/providers.md](docs/providers.md).
+**Sandboxed labs (phase 4).** A lesson can offer a hands-on lab: a disposable, isolated container running an
+*intentionally vulnerable toy application*, with a browser terminal, the lab's own web app in a sandboxed
+frame, and objectives that are verified against how the lab *behaves* (an exploit that really works, a fix that
+really blocks it while the app still does its job). Each student gets their own lab on a private network with no
+route out (proven before it starts), hard CPU/memory/process limits, a read-only filesystem, no capabilities and no
+host mounts; it can be reset at any time and is deleted when its time runs out. Off by default (`SANDBOX_ENABLED`);
+needs a Docker daemon the backend may drive. The demo lab is a path-traversal toy app at `/labs`. See
+[docs/sandbox.md](docs/sandbox.md).
+
+**Not implemented yet (later phases):** user accounts (learners are anonymous, identified by a cookie) and labs for
+arbitrary CVEs. See [docs/roadmap.md](docs/roadmap.md) and [docs/providers.md](docs/providers.md).
 
 > **Guides work without an API key.** With no `ANTHROPIC_API_KEY` the guide is assembled from
 > verbatim excerpts of the sources. Set the key (backend/worker only) for model-written guides.
@@ -57,7 +66,9 @@ backend/          FastAPI, Pydantic, SQLAlchemy, Alembic
   app/models/       ORM models       app/schemas/  normalised, provider-independent schemas
   app/learning/     interactive challenge, answer rubric, scoring, AI tutor
   app/research/     research pipeline: discovery, safe fetching, extraction, screening, synthesis, validation
-  app/workers/      RQ queue, research job and worker entry point
+  app/sandbox/      sandboxed labs: templates, Docker runtime, network controller, instance manager, cleanup, verifier, terminal gateway
+  app/workers/      RQ queue, research job and worker; the lab cleanup worker
+labs/             lab definitions (lab.json + Dockerfile + the intentionally vulnerable toy app) and the isolation-probe image
 services/         future standalone services (see services/README.md)
 infrastructure/   deployment/infra assets
 docs/             architecture, providers, data model, security, roadmap
@@ -119,6 +130,7 @@ make lint        # ruff + eslint
 make typecheck   # mypy + tsc
 make smoke       # against a running stack
 make verify-providers   # against the REAL NVD / MITRE / CISA APIs (needs internet)
+make test-sandbox-docker # sandbox tests on a REAL Docker daemon (root; builds the lab images; starts containers)
 ```
 
 Backend tests use in-memory SQLite and mocked HTTP by default. To run them on PostgreSQL, create a
@@ -143,6 +155,7 @@ REDIS_TEST_URL=redis://:pass@localhost:6379/0 make test-backend
 | GET | `/api/cves/{cve_id}/research/status` | `not_started / queued / researching / synthesizing / ready / failed`, counts, versions, error. Poll this. |
 | GET | `/api/cves/{cve_id}/research` | The stored guide (every claim with evidence level and citations), sources used, and what happened to every other source. 404 until a guide exists. |
 | POST/GET | `/api/learning…` | Learning sessions: create/start/complete, hints (`GET …/hints`, `POST …/hints`), answers, solution, AI tutor. Needs the `X-Learner-Token` header (set by the web app from a cookie). See [docs/learning.md](docs/learning.md#api). |
+| `/api/sandbox…` | | Sandboxed labs: catalogue, start/reset/stop, verify, isolation check, terminal ticket, lab progress per learning session; plus the lab's web app and the terminal WebSocket. Off unless `SANDBOX_ENABLED=true`. See [docs/sandbox.md](docs/sandbox.md#api). |
 | GET | `/api/sources/{source_id}` | Stored source by UUID. |
 
 Response shape (abridged):
@@ -183,4 +196,5 @@ exposed to the browser.
 - [Data providers, caching and rate limiting](docs/providers.md)
 - [Data model](docs/data-model.md)
 - [Security design](docs/security.md)
+- [Sandboxed labs](docs/sandbox.md)
 - [Roadmap](docs/roadmap.md)

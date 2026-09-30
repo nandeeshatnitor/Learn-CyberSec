@@ -54,6 +54,28 @@ Full design in [learning.md](learning.md). Controls and where they are tested:
 | Browser → backend | Same-origin route handlers only, fixed path/method allow-list (no traversal), cross-site POSTs refused, request bodies re-serialised and size-capped, only a sanitised `X-Forwarded-For` and the learner token forwarded, fixed error fields, unexpected statuses become a generic 503. |
 | Cost and abuse | Tutor questions limited per session and per client; sessions per client per hour; learning endpoints have their own read budget. |
 
+## Phase 4: sandboxed labs
+
+Full design, measurements and deployment requirements in [sandbox.md](sandbox.md). Controls and where they are tested
+(`backend/tests/sandbox/`; the container and network claims on **real Docker** in `test_docker_integration.py`):
+
+| Requirement | How it is handled |
+| --- | --- |
+| Only our own labs, never arbitrary access | Labs come only from `labs/*/lab.json`, validated with `extra="forbid"`; the image must be from an allow-listed repository and already exist locally (never pulled); there is no field for mounts, capabilities, privileged, ports, or root; the start endpoint takes only a lab id. |
+| Hardened container | One fixed `docker run` line (`--cap-drop ALL`, `no-new-privileges`, `--read-only`, size-limited `noexec` tmpfs, CPU/memory (no swap)/pids limits, non-root user, no `-v`/`-p`/`--privileged`/`--pid`/`--device`), tested flag by flag; the *running* container is audited (`docker inspect`) and destroyed if it deviates. |
+| No route out, no route to the host or other labs | Own `--internal` network per lab; a host firewall chain drops lab traffic to the host (measured: Docker does not); **an isolation probe runs on the lab's own network before the student's container exists and any success aborts the start** (fail-closed; verified with the rule removed). Cloud metadata addresses, the internet, DNS, host service ports and other labs are all probed. |
+| Browser never touches the runtime | Terminal via a WebSocket gateway with single-use hashed tickets (bound to lab + learner, seconds long), `Origin` check, fixed command from the definition, clamped input/size, idle and lease limits. The web app is served through the platform under `CSP: sandbox` (no same-origin), `nosniff`, no cookies relayed, header allow-list, capability URL; the frame is `sandbox="allow-forms allow-scripts"`. |
+| Platform → lab requests can't be steered (SSRF) | The address comes from the instance record, must be inside the lab pool, port must be declared, method GET/HEAD/POST, path validated (no host/scheme/CRLF), no redirects, no env proxies. |
+| One student can't see or affect another's lab | Anonymous learner hash on every row; another learner's lab is a 404 on every endpoint; one live lab per learner enforced by a partial unique index; per-lab networks. |
+| Verification can't be faked by typing | Behaviour-based (a request the app answers with the instance's random secret; a restart-and-retest of a fix incl. the student's payload and legitimate behaviour); the secret cannot be pasted into the request. |
+| Nothing outlives its lease | Enforced on access, by the cleanup worker (also finds orphans by label), and by an in-container `timeout -s KILL` that works with the platform down. |
+| Fixed messages | A failed start returns one of a fixed set of messages; runtime output is only ever logged. |
+| Off by default | `SANDBOX_ENABLED=false`; the Docker driver is a separate privileged concern (see below). |
+
+**Deployment risks to plan for:** the process that drives Docker is effectively root on its Docker host (use a dedicated
+host/VM or rootless daemon; never expose the socket to an internet-facing container); containers share the host kernel
+(consider gVisor/Kata); the firewall rule needs root/`CAP_NET_ADMIN`; IPv6 is not covered.
+
 ## Trust and provenance (integrity of what users are told)
 
 * Data is presented as *retrieved from* a named source, never as verified by this platform.
@@ -85,5 +107,6 @@ Full design in [learning.md](learning.md). Controls and where they are tested:
   a learning exercise, not for anything sensitive; add real accounts before storing more than progress.
 * Answer checking is keyword/concept matching (see [learning.md](learning.md#answer-checking)); it can
   misjudge unusual phrasing in both directions.
+* **Sandboxed labs are only as isolated as the host kernel and Docker daemon they run on.** See [sandbox.md](sandbox.md#known-limitations).
 * Phase 2 has not been run against the live web or the live Anthropic API in development (no network
   or key); it is tested with mock transports and fake models.

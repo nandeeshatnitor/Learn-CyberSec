@@ -66,6 +66,19 @@ the evidence sources)); `learning_task_progress` (per task: `status` open/correc
 feedback); `tutor_messages` (`position`, `role`, `content`, structured `payload` with citations,
 `outcome`). Child tables cascade with the session.
 
+### Sandboxed labs (migration 0005)
+
+`lab_instances` (one disposable lab: `lab_id`, `user_id` (anonymous learner hash), `session_id` (FK, SET NULL),
+`reset_of`, `status` starting/running/expired/stopping/stopped/failed, `started_at`, `expires_at`, `stopped_at`,
+`cleaned_at` (set only once the container and network are confirmed gone), `stop_reason`, `failure_code` (a fixed
+code, never runtime output), `lease_seconds`, `canary` (per-instance secret, never returned by the API),
+`container_name`, `network_name`, `address`, `app_token` (capability for the lab's web app URL, cleared when the lab
+ends), `image`, `template_version`, `limits`). A **partial unique index** on `user_id` for the live statuses allows one live
+lab per learner and makes concurrent starts race-free. `lab_verifications` (per instance and check: `passed`, `attempts`,
+`first_passed_at`, `detail`, the `evidence` that earned the pass; unique per instance and check; this is the learner's lab
+progress). `lab_terminal_tickets` (single-use terminal tickets: SHA-256 of the ticket, instance, learner, `expires_at`,
+`used_at`). Lab *definitions* are JSON files in `labs/`, not rows.
+
 ## Placeholders (documented only; no tables yet)
 
 | Entity | Intended purpose | Phase |
@@ -74,8 +87,8 @@ feedback); `tutor_messages` (`position`, `role`, `content`, structured `payload`
 | `SearchQuery` | Search history / popularity | later |
 | `LearningGuide` | *Implemented* as the validated JSON in `research_runs.guide` (schema: `app/research/synthesis/schema.py`); a dedicated table is only needed if guides must be queried by field | phase 2 |
 | `UserProgress` | Cross-device, per-account progress (sessions exist; identity is anonymous today) | accounts |
-| `LabDefinition` | Declarative sandbox environments | sandbox |
-| `LabAttempt` | A user's run of a lab | sandbox |
+| `LabDefinition` | *Implemented* as validated JSON files in `labs/` (schema: `app/sandbox/template.py`) | phase 4 |
+| `LabAttempt` | *Implemented* as `lab_instances` + `lab_verifications` | phase 4 |
 
 ## Migrations
 

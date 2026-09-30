@@ -69,6 +69,17 @@ what the student has earned; `learning/rubric.py` grades answers, `learning/scor
 guides use. The `/learn/[cveId]` page is a client workspace over same-origin route handlers that add the
 learner cookie. Details: [learning.md](learning.md).
 
+## Sandboxed labs
+
+`SandboxManager` (facade) → `InstanceManager` (lifecycle state machine, reset, lease) → `NetworkController` (a private
+`--internal` network per lab, the host firewall rule, the isolation proof that gates every start) → the Docker runtime
+(one fixed hardened `docker run` command line, audited on the running container); `CleanupManager` (run by
+`python -m app.workers.sandbox_worker`) guarantees nothing outlives its lease; `Verifier` checks objectives against the
+lab's behaviour; `TerminalGateway` bridges a ticketed browser WebSocket to `docker exec` on a pty. Lab definitions are
+JSON in `labs/`, validated like untrusted input. The browser reaches everything through same-origin route handlers
+(`/api/sandbox`, `/lab-app`) except the terminal WebSocket. Details, isolation findings and deployment:
+[sandbox.md](sandbox.md).
+
 ## Adding services later
 
 `services/` is reserved for standalone deployable units (for example an ingestion worker or a

@@ -5,6 +5,9 @@ The static guide from [research.md](research.md) is turned into a guided exercis
 never shown up front; the student earns it, or chooses to reveal it and pays a small, configurable
 cost. The static reference guide is still available on the CVE page, tucked behind a "spoiler" fold.
 
+Hands-on practice: when the session's CVE has a weakness that a lab teaches, the lesson page shows a **Hands-on lab** card
+(with the learner's verified objectives) and the lab page links back to it; see [sandbox.md](sandbox.md#progress-integration).
+
 Code: `backend/app/learning/` (challenge, rubric, scoring, tutor), `app/services/learning_service.py`,
 `app/api/routes/learning.py`, `frontend/src/components/learn/`, page `/learn/[cveId]`.
 

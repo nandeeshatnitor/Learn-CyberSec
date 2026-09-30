@@ -36,29 +36,40 @@ describe("contentSecurityPolicy", () => {
   });
 });
 
-describe("lab page headers (proxy)", () => {
-  it("names the terminal gateway origin, read at runtime, only on lab pages", () => {
+describe("page headers (proxy)", () => {
+  it("gives every page the same policy, naming the terminal gateway origin read at runtime", () => {
     process.env.TERMINAL_WS_ORIGIN = "wss://labs.example.com";
-    const csp = run("/lab/22222222-2222-4222-8222-222222222222").headers.get("content-security-policy");
-    expect(csp).toContain("connect-src 'self'");
-    expect(csp).toContain("wss://labs.example.com");
-    expect(csp).toContain("frame-ancestors 'none'");
-    expect(run("/lab/x").headers.get("x-frame-options")).toBe("DENY");
-    expect(run("/lab/x").headers.get("x-content-type-options")).toBe("nosniff");
-    expect(run("/learn/CVE-2099-12345").headers.get("content-security-policy")).toBeNull(); // next.config covers these
+    // The same policy on lessons and labs: a client-side navigation keeps the first page's policy.
+    for (const path of ["/", "/cves", "/cves/CVE-2099-12345", "/learn/CVE-2099-12345", "/labs", "/lab/22222222-2222-4222-8222-222222222222"]) {
+      const response = run(path);
+      const csp = response.headers.get("content-security-policy");
+      expect(csp, path).toContain("connect-src 'self'");
+      expect(csp, path).toContain("wss://labs.example.com");
+      expect(csp, path).toContain("frame-ancestors 'none'");
+      expect(response.headers.get("x-frame-options"), path).toBe("DENY");
+      expect(response.headers.get("x-content-type-options"), path).toBe("nosniff");
+      expect(response.headers.get("referrer-policy"), path).toBe("strict-origin-when-cross-origin");
+    }
+  });
+
+  it("does not add the terminal origin when none is configured", () => {
+    const csp = run("/learn/CVE-2099-12345").headers.get("content-security-policy")!;
+    expect(csp).toMatch(/connect-src 'self'( ws:)?;/); // (`ws:` is the dev-server allowance)
   });
 
   it("ignores an invalid TERMINAL_WS_ORIGIN instead of widening the policy", () => {
     process.env.TERMINAL_WS_ORIGIN = "wss://evil.example.com; script-src *";
     const csp = run("/lab/x").headers.get("content-security-policy")!;
     expect(csp).not.toContain("evil");
-    expect(csp).toMatch(/connect-src 'self'( ws:)?;/); // (`ws:` is the dev-server allowance)
+    expect(csp).toMatch(/connect-src 'self'( ws:)?;/);
   });
 
-  it("does not touch the headers of the lab's own app (the backend sets them)", () => {
-    const response = run("/lab-app/22222222-2222-4222-8222-222222222222/tokentokentokentoken0123/");
-    expect(response.headers.get("content-security-policy")).toBeNull();
-    expect(response.headers.get("x-frame-options")).toBeNull();
+  it("does not touch the API handlers or the lab's own app (whose headers come from the backend)", () => {
+    for (const path of ["/api/sandbox/labs", "/api/learning/x", "/lab-app/22222222-2222-4222-8222-222222222222/tokentokentokentoken0123/"]) {
+      const response = run(path);
+      expect(response.headers.get("content-security-policy"), path).toBeNull();
+      expect(response.headers.get("x-frame-options"), path).toBeNull();
+    }
   });
 });
 

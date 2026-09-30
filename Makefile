@@ -5,7 +5,7 @@ PY    := $(VENV)/bin/python
 .DEFAULT_GOAL := help
 .PHONY: help setup install up down logs migrate seed backend-dev frontend-dev \
         test test-backend test-frontend lint typecheck smoke verify-providers fake-providers \
-        worker fake-research
+        worker fake-research lab-images sandbox-worker test-sandbox-docker
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -43,6 +43,16 @@ worker: ## Run the research worker (learning-guide generation); needs REDIS_URL 
 
 fake-research: ## Research worker on a FICTIONAL web (dev only; FAKE_LLM=malicious for a hostile model). Needs fake-providers
 	cd backend && ../$(PY) ../scripts/fake_research.py
+
+lab-images: ## Build the lab images locally (never pulled): the demo lab and the network-isolation probe
+	docker build -t cvelearn-lab/net-probe:1 labs/_net-probe
+	docker build -t cvelearn-lab/path-traversal-101:1 labs/path-traversal-101
+
+sandbox-worker: ## Run the lab cleanup worker (needs SANDBOX_ENABLED=true and a Docker daemon it may drive)
+	cd backend && ../$(PY) -m app.workers.sandbox_worker
+
+test-sandbox-docker: lab-images ## Run the sandbox tests against a REAL Docker daemon (root; starts containers, edits iptables)
+	cd backend && SANDBOX_TEST_DOCKER=1 ../$(PY) -m pytest tests/sandbox/test_docker_integration.py
 
 frontend-dev: ## Run the web app on :3000
 	cd frontend && npm run dev
