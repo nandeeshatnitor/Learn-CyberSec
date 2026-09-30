@@ -23,5 +23,5 @@ COPY --from=build --chown=node:node /app/public ./public
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=5 \
-  CMD wget -q -O /dev/null http://127.0.0.1:3000/cves/invalid || exit 1
+  CMD wget -q -O /dev/null http://127.0.0.1:3000/icon.svg || exit 1
 CMD ["node", "server.js"]

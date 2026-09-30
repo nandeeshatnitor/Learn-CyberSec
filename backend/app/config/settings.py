@@ -6,8 +6,12 @@ No secrets have defaults here: DATABASE_URL must be provided by the environment.
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from app.utils.client_ip import parse_networks
+
+KNOWN_PROVIDERS = frozenset({"nvd", "mitre", "cisa_kev"})
 
 
 class Settings(BaseSettings):
@@ -33,10 +37,94 @@ class Settings(BaseSettings):
     # Upper bound applied to every paginated endpoint.
     max_page_size: int = Field(default=50, ge=1, le=200)
 
-    @field_validator("redis_url", mode="before")
+    # --- External vulnerability data providers --------------------------------------------------
+    # Comma-separated provider IDs to enable; unknown IDs are rejected at startup.
+    enabled_providers: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["nvd", "mitre", "cisa_kev"]
+    )
+    nvd_base_url: str = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+    # Optional. Raises NVD's rate limit; only ever sent to NVD in a request header.
+    nvd_api_key: SecretStr | None = None
+    mitre_base_url: str = "https://cveawg.mitre.org/api/cve"
+    kev_feed_url: str = (
+        "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+    )
+    # Plain-http provider URLs are refused unless this is set (never allowed in production).
+    allow_insecure_provider_urls: bool = False
+    provider_connect_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
+    provider_read_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    provider_max_response_bytes: int = Field(default=10_000_000, ge=1_000, le=100_000_000)
+    kev_max_response_bytes: int = Field(default=20_000_000, ge=1_000, le=100_000_000)
+
+    # --- Caching (Redis, with an in-process fallback when Redis is not configured) --------------
+    cache_ttl_seconds: int = Field(default=6 * 3600, ge=0)  # fresh CVE metadata
+    cache_stale_ttl_seconds: int = Field(
+        default=7 * 24 * 3600, ge=0
+    )  # how long a stale copy is kept
+    cache_negative_ttl_seconds: int = Field(default=600, ge=0)  # "provider has no such CVE"
+    cache_search_ttl_seconds: int = Field(default=900, ge=0)
+    kev_cache_ttl_seconds: int = Field(default=6 * 3600, ge=0)
+
+    # --- Outbound rate limits (requests per window, per provider, shared across workers) --------
+    # None means "pick a safe default" (NVD: 5/30s without a key, 50/30s with one, minus headroom).
+    nvd_rate_limit_requests: int | None = Field(default=None, ge=1)
+    nvd_rate_limit_window_seconds: int = Field(default=30, ge=1)
+    mitre_rate_limit_requests: int = Field(default=30, ge=1)
+    mitre_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    kev_rate_limit_requests: int = Field(default=4, ge=1)
+    kev_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    circuit_failure_threshold: int = Field(default=3, ge=1)
+    circuit_reset_seconds: float = Field(default=30.0, gt=0)
+
+    # --- Inbound rate limit for the CVE endpoints (per client IP) -------------------------------
+    api_rate_limit_requests: int = Field(default=60, ge=1)
+    api_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    # Reverse proxies / the web app whose X-Forwarded-For header may be believed (addresses or
+    # CIDRs, comma-separated). Empty: the header is ignored and the TCP peer is the client.
+    trusted_proxies: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
+    @field_validator("redis_url", "nvd_api_key", mode="before")
     @classmethod
-    def _empty_redis_url_is_unset(cls, value: object) -> object:
+    def _empty_secret_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("nvd_rate_limit_requests", mode="before")
+    @classmethod
+    def _empty_int_is_unset(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("trusted_proxies", mode="before")
+    @classmethod
+    def _split_proxies(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("enabled_providers", mode="before")
+    @classmethod
+    def _split_providers(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip().lower() for item in value.split(",") if item.strip()]
+        return value
+
+    @model_validator(mode="after")
+    def _validate_provider_settings(self) -> "Settings":
+        unknown = set(self.enabled_providers) - KNOWN_PROVIDERS
+        if unknown:
+            raise ValueError(f"unknown providers in ENABLED_PROVIDERS: {sorted(unknown)}")
+        try:
+            parse_networks(tuple(self.trusted_proxies))
+        except ValueError as exc:
+            raise ValueError(f"invalid TRUSTED_PROXIES entry: {exc}") from exc
+        if self.allow_insecure_provider_urls and self.environment == "production":
+            raise ValueError("ALLOW_INSECURE_PROVIDER_URLS must not be enabled in production")
+        return self
+
+    @property
+    def effective_nvd_rate_limit(self) -> int:
+        if self.nvd_rate_limit_requests is not None:
+            return self.nvd_rate_limit_requests
+        return 45 if self.nvd_api_key is not None else 4
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod

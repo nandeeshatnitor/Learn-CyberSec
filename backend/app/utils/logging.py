@@ -43,6 +43,10 @@ def configure_logging(level: str = "INFO", json_logs: bool = False) -> None:
     root.setLevel(level)
     # Uvicorn's access log is replaced by our own request middleware.
     logging.getLogger("uvicorn.access").disabled = True
+    # HTTP client libraries log every request URL at INFO, query string included. Provider
+    # queries carry user search terms, so keep them out of the logs.
+    for noisy in ("httpx", "httpx2", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:

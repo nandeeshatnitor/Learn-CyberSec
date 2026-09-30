@@ -1,79 +1,84 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { CveSearchForm } from "@/components/cve-search-form";
-import { SeverityBadge } from "@/components/severity-badge";
-import { Card } from "@/components/ui/card";
+import { ProviderStatusBanner } from "@/components/cve/provider-status-banner";
+import { SearchResultList } from "@/components/cve/search-result-list";
+import { SearchEmptyState, SearchErrorState, SearchPrompt } from "@/components/cve/search-states";
+import { Pagination } from "@/components/pagination";
 import { searchCves } from "@/lib/api";
-import { normalizeCveId, sanitizeQuery } from "@/lib/cve";
+import { normalizeCveId } from "@/lib/cve";
+import { buildSearchHref, parseSearchParams } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: "Search results" };
 export const dynamic = "force-dynamic";
 
+const QUERY_NOTES = {
+  cve_id: null,
+  partial_cve_id:
+    "Partial CVE IDs only match CVEs this platform has already retrieved and the CISA KEV catalogue.",
+  keyword: null,
+} as const;
+
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q } = await searchParams;
-  const query = sanitizeQuery(Array.isArray(q) ? q[0] : q);
+  const params = parseSearchParams(await searchParams);
 
-  // A well-formed CVE ID goes straight to its page (which explains if it isn't available yet).
-  const cveId = normalizeCveId(query);
-  if (cveId) redirect(`/cves/${cveId}`);
+  // A well-formed CVE ID goes straight to its page, which explains if it cannot be found.
+  const cveId = normalizeCveId(params.q);
+  if (cveId && !params.severity && !params.knownExploited) redirect(`/cves/${cveId}`);
 
-  const result = query ? await searchCves(query) : null;
+  const result = params.q
+    ? await searchCves(params.q, {
+        page: params.page,
+        severity: params.severity,
+        knownExploited: params.knownExploited,
+      })
+    : null;
 
   return (
     <div className="space-y-8">
       <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Search</h1>
-        <CveSearchForm defaultValue={query} />
+        <CveSearchForm
+          defaultValue={params.q}
+          showFilters
+          severity={params.severity}
+          knownExploited={params.knownExploited}
+        />
       </div>
 
-      {!query && (
-        <p className="text-muted-foreground">Enter a CVE ID or a keyword to search.</p>
-      )}
-
-      {result && !result.ok && (
-        <Card className="p-5" role="alert">
-          {result.kind === "unavailable"
-            ? "The search service is unavailable right now. Please try again shortly."
-            : "That search could not be processed. Try a different query."}
-        </Card>
-      )}
+      {!result && <SearchPrompt />}
+      {result && !result.ok && <SearchErrorState error={result} />}
 
       {result?.ok && (
-        <section aria-live="polite" className="space-y-4">
+        <section aria-live="polite" className="space-y-4" data-testid="search-results">
           <p className="text-sm text-muted-foreground">
-            {result.data.total} result{result.data.total === 1 ? "" : "s"} in the local database
-            for <span className="font-mono text-foreground">{result.data.query}</span>
+            {result.data.total.toLocaleString("en-US")} result{result.data.total === 1 ? "" : "s"} for{" "}
+            <span className="font-mono text-foreground">{result.data.query}</span>
+            {(params.severity || params.knownExploited) && " (filtered)"}
           </p>
-          {result.data.total === 0 ? (
-            <Card className="border-dashed bg-transparent p-5 text-muted-foreground">
-              Nothing matched. Retrieval from public sources (NVD, MITRE, vendor advisories, …) is
-              not implemented yet, so only locally stored records can be found.
-            </Card>
+          <ProviderStatusBanner meta={result.data.meta} />
+          {QUERY_NOTES[result.data.query_type] && (
+            <p className="text-sm text-muted-foreground">{QUERY_NOTES[result.data.query_type]}</p>
+          )}
+          {result.data.items.length === 0 ? (
+            <SearchEmptyState
+              query={result.data.query}
+              filtered={Boolean(params.severity || params.knownExploited)}
+            />
           ) : (
-            <ul className="space-y-3">
-              {result.data.items.map((item) => (
-                <li key={item.id}>
-                  <Link
-                    href={`/cves/${item.cve_id}`}
-                    className="block rounded-lg border bg-card p-4 transition-colors hover:border-primary/60"
-                  >
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="font-mono font-medium text-primary">{item.cve_id}</span>
-                      <SeverityBadge severity={item.severity} score={item.cvss_score} />
-                    </div>
-                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                      {item.description}
-                    </p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <>
+              <SearchResultList items={result.data.items} />
+              <Pagination
+                page={result.data.page}
+                pages={result.data.pages}
+                hrefFor={(page) => buildSearchHref({ ...params, page })}
+              />
+            </>
           )}
         </section>
       )}

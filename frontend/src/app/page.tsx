@@ -51,14 +51,14 @@ export default function HomePage() {
           ))}
         </ul>
         <p className="text-sm text-muted-foreground">
-          Only a handful of sample records exist so far. Retrieval from public sources is not
-          implemented yet.
+          Details are retrieved live from public sources (NVD, MITRE / CVE Program and the CISA KEV
+          catalogue) and attributed to them. They are not independently verified here.
         </p>
       </section>
 
       <section aria-labelledby="how-title" className="space-y-4">
         <h2 id="how-title" className="text-xl font-semibold">
-          How it will work
+          What you will get
         </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {LEARNING_STEPS.map(({ icon: Icon, title, text }) => (

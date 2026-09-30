@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
+from app.api.dependencies import shutdown_infrastructure
 from app.api.errors import register_exception_handlers
 from app.api.middleware import RequestContextMiddleware
 from app.api.router import api_router
@@ -21,6 +22,7 @@ def create_app() -> FastAPI:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         log.info("startup", environment=settings.environment, version=__version__)
         yield
+        shutdown_infrastructure()
         log.info("shutdown")
 
     app = FastAPI(

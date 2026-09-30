@@ -27,4 +27,4 @@ class DataOrigin(enum.StrEnum):
     """Where a CVE record came from, so the UI never presents guesses as retrieved facts."""
 
     SEED = "seed"  # hand-entered development fixture, NOT retrieved from an authority
-    NVD = "nvd"  # reserved for the retrieval phase
+    PROVIDERS = "providers"  # retrieved from external providers (NVD, MITRE, CISA KEV, ...)

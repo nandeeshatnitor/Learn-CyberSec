@@ -1,0 +1,38 @@
+{
+  "resultsPerPage": 4, "startIndex": 0, "totalResults": 4, "vulnerabilities": [
+    {"cve": {
+      "id": "CVE-2099-0001",
+      "published": "not-a-date", "lastModified": "2099-01-01T00:00:00.000", "vulnStatus": "Analyzed\u0000‮",
+      "descriptions": [
+        {"lang": "fr", "value": "Ceci n'est pas anglais"},
+        {"lang": "en", "value": "<script>alert(document.cookie)</script> Click <a href=\"javascript:alert(1)\">here</a>\u0000\u001b[31m ‮gnp.exe​  "}
+      ],
+      "metrics": {
+        "cvssMetricV31": [
+          {"source": "nvd@nist.gov", "type": "Primary", "cvssData": {"version": "3.1", "vectorString": "CVSS:3.1/AV:N/'; DROP TABLE cves;--", "baseScore": 99.9, "baseSeverity": "CRITICAL"}},
+          {"source": "nvd@nist.gov", "type": "Primary", "cvssData": {"version": "3.1", "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "baseScore": "9.8", "baseSeverity": "CRITICAL"}},
+          {"source": "nvd@nist.gov", "type": "Primary", "cvssData": {"version": "3.1", "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "baseScore": 9.8, "baseSeverity": "SUPER-BAD"}}
+        ]
+      },
+      "weaknesses": [{"description": [{"lang": "en", "value": "CWE-79"}, {"lang": "en", "value": "<img src=x onerror=alert(1)>"}, {"lang": "en", "value": "CWE-"}]}],
+      "configurations": [{"nodes": [{"cpeMatch": [
+        {"vulnerable": true, "criteria": "cpe:2.3:a:evil<script>:prod:1.0:*:*:*:*:*:*:*"},
+        {"vulnerable": true, "criteria": "not-a-cpe"},
+        {"vulnerable": "yes", "criteria": "cpe:2.3:a:apache:log4j:*:*:*:*:*:*:*:*"}
+      ]}]}],
+      "references": [
+        {"url": "javascript:alert(1)", "tags": ["Vendor Advisory"]},
+        {"url": "data:text/html,<script>alert(1)</script>", "tags": []},
+        {"url": "file:///etc/passwd", "tags": []},
+        {"url": "//evil.example/x", "tags": []},
+        {"url": "https://example.com/has space", "tags": []},
+        {"url": "https://example.com/ok?a=1&b=<b>", "tags": ["Patch", "<script>", "Patch"]},
+        {"url": "https://example.com/ok?a=1&b=<b>", "tags": ["Exploit"]},
+        {"url": 12345, "tags": "not-a-list"}
+      ]
+    }},
+    {"cve": {"id": "not-a-cve-id", "descriptions": [{"lang": "en", "value": "bad id"}]}},
+    "a string where an object should be",
+    {"cve": null}
+  ]
+}

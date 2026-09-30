@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, JSONType, TimestampMixin, UUIDPrimaryKeyMixin, string_enum
@@ -27,6 +27,14 @@ class CVE(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         JSONType, nullable=False, default=list
     )
     data_origin: Mapped[DataOrigin] = mapped_column(string_enum(DataOrigin), nullable=False)
+    vuln_status: Mapped[str | None] = mapped_column(String(50))
+    # NULL = unknown (the KEV catalogue could not be consulted when this was stored).
+    known_exploited: Mapped[bool | None] = mapped_column(Boolean)
+    # When the providers' data was last retrieved (NULL for hand-entered seed rows).
+    retrieved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The full normalised CVERecord as returned by the API (source of truth for stored copies);
+    # the columns above are denormalised for querying. NULL for seed rows.
+    record: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
 
     references: Mapped[list["CVEReference"]] = relationship(
         back_populates="cve", cascade="all, delete-orphan", order_by="CVEReference.created_at"
