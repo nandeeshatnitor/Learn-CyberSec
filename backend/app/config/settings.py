@@ -4,6 +4,7 @@ No secrets have defaults here: DATABASE_URL must be provided by the environment.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -12,6 +13,9 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from app.utils.client_ip import parse_networks
 
 KNOWN_PROVIDERS = frozenset({"nvd", "mitre", "cisa_kev"})
+
+# backend/app/config/settings.py -> the repository root, where the lab definitions live.
+DEFAULT_LAB_DIR = Path(__file__).resolve().parents[3] / "labs"
 
 
 class Settings(BaseSettings):
@@ -135,6 +139,50 @@ class Settings(BaseSettings):
     learning_sessions_per_client_per_hour: int = Field(default=20, ge=1)
     learning_read_rate_limit_requests: int = Field(default=240, ge=1)  # per minute per client
 
+    # --- Sandboxed labs (phase 4) ---------------------------------------------------------------
+    # Off by default: labs need a container runtime the platform is allowed to drive (ideally a
+    # dedicated or rootless daemon, see docs/sandbox.md). Nothing else depends on it.
+    sandbox_enabled: bool = False
+    sandbox_lab_dir: Path = DEFAULT_LAB_DIR
+    sandbox_docker_binary: str = Field(default="docker", min_length=1, max_length=200)
+    # Optional DOCKER_HOST for a dedicated daemon (never the daemon that runs the platform itself).
+    sandbox_docker_host: str | None = Field(default=None, max_length=200)
+    # Lab images must come from these repositories and must already exist locally: never pulled.
+    sandbox_allowed_image_prefixes: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["cvelearn-lab/"]
+    )
+    sandbox_probe_image: str = Field(default="cvelearn-lab/net-probe:1", min_length=3)
+    # Each lab gets its own /28 from this pool, on its own internal (no-egress) bridge network.
+    sandbox_subnet_pool: str = "10.200.0.0/16"
+    # Drop traffic from lab bridges to the host itself (docker's internal networks do not).
+    sandbox_manage_host_firewall: bool = True
+    # Before a lab starts, prove from inside its network that the host, the internet, the cloud
+    # metadata address and other labs are unreachable; refuse to start it otherwise.
+    sandbox_isolation_gate: bool = True
+    # Shortens every lab lease (never lengthens it): for demos and tests.
+    sandbox_timeout_scale: float = Field(default=1.0, gt=0, le=1.0)
+    # The container kills itself this long after its lease ends even if no cleanup worker runs.
+    sandbox_container_grace_seconds: int = Field(default=60, ge=0, le=3600)
+    sandbox_start_timeout_seconds: int = Field(default=90, ge=10, le=600)
+    sandbox_max_active_instances: int = Field(default=20, ge=1, le=1000)
+    sandbox_starts_per_learner_per_hour: int = Field(default=12, ge=1)
+    # Upper bounds a lab definition may ask for (a definition above these is rejected at load).
+    sandbox_max_cpus: float = Field(default=2.0, gt=0, le=16)
+    sandbox_max_memory_mb: int = Field(default=1024, ge=32, le=16384)
+    sandbox_max_pids: int = Field(default=512, ge=16, le=8192)
+    sandbox_max_tmpfs_mb: int = Field(default=64, ge=1, le=1024)
+    sandbox_max_timeout_minutes: int = Field(default=240, ge=1, le=1440)
+    sandbox_cleanup_interval_seconds: float = Field(default=15.0, ge=1, le=600)
+    sandbox_verify_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
+    sandbox_proxy_max_bytes: int = Field(default=2_000_000, ge=10_000, le=20_000_000)
+    sandbox_read_rate_limit_requests: int = Field(default=300, ge=1)  # per minute per client
+    # Terminal gateway: the browser gets a single-use ticket, then a WebSocket to this backend.
+    # Base URL the browser should use (e.g. wss://labs.example.com); None: derive from the page.
+    sandbox_terminal_public_url: str | None = Field(default=None, max_length=200)
+    sandbox_terminal_ticket_ttl_seconds: int = Field(default=30, ge=5, le=300)
+    sandbox_terminal_idle_seconds: int = Field(default=600, ge=30, le=7200)
+    sandbox_terminal_max_per_instance: int = Field(default=2, ge=1, le=10)
+
     @field_validator("redis_url", "nvd_api_key", "anthropic_api_key", "github_token", mode="before")
     @classmethod
     def _empty_secret_is_unset(cls, value: object) -> object:
@@ -143,6 +191,18 @@ class Settings(BaseSettings):
     @field_validator("nvd_rate_limit_requests", mode="before")
     @classmethod
     def _empty_int_is_unset(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("sandbox_allowed_image_prefixes", mode="before")
+    @classmethod
+    def _split_prefixes(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("sandbox_docker_host", "sandbox_terminal_public_url", mode="before")
+    @classmethod
+    def _empty_text_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("trusted_proxies", mode="before")

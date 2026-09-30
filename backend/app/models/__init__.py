@@ -3,15 +3,20 @@
 Implemented: CVE, CVEReference, Source, ResearchRun, ResearchRunSource, LearningSession and its
 progress/hint/attempt/tutor tables.
 
+LabInstance, LabVerification and TerminalTicket (sandboxed labs).
+
 Documented placeholders (not yet tables; see docs/data-model.md): User, SearchQuery,
-CVEAnalysis, LearningGuide, LabDefinition, LabAttempt.
+CVEAnalysis, LearningGuide.
 """
 
 from app.models.cve import CVE, CVEReference
 from app.models.enums import (
     ACTIVE_LEARNING_STATUSES,
     ACTIVE_RESEARCH_STATUSES,
+    LAB_TRANSITIONS,
+    LIVE_LAB_STATUSES,
     DataOrigin,
+    LabStatus,
     LearningStatus,
     ReliabilityLevel,
     ResearchStatus,
@@ -26,6 +31,7 @@ from app.models.learning import (
     TutorMessage,
 )
 from app.models.research import ResearchRun, ResearchRunSource
+from app.models.sandbox import LabInstance, LabVerification, TerminalTicket
 from app.models.source import Source
 
 __all__ = [
@@ -34,6 +40,11 @@ __all__ = [
     "CVE",
     "CVEReference",
     "DataOrigin",
+    "LAB_TRANSITIONS",
+    "LIVE_LAB_STATUSES",
+    "LabInstance",
+    "LabStatus",
+    "LabVerification",
     "LearningAttempt",
     "LearningHintEvent",
     "LearningSession",
@@ -46,5 +57,6 @@ __all__ = [
     "Source",
     "SourceStatus",
     "SourceType",
+    "TerminalTicket",
     "TutorMessage",
 ]

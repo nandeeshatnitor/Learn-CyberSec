@@ -23,12 +23,13 @@ import {
  * to their fixed code and message.
  */
 export const LEARNER_COOKIE = "cvele_learner";
-const PASS_THROUGH = new Set([200, 401, 404, 409, 422, 429, 503]);
+const LEARNING_PASS_THROUGH = new Set([200, 401, 404, 409, 422, 429, 503]);
 const MAX_BODY_BYTES = 20_000;
 
 const UUID = "[0-9a-fA-F-]{36}";
 const TASK = "t[0-9]{1,2}";
-const ROUTES: { method: "GET" | "POST"; pattern: RegExp }[] = [
+export type LearnerRoute = { method: "GET" | "POST"; pattern: RegExp };
+const ROUTES: LearnerRoute[] = [
   { method: "POST", pattern: /^$/ },
   { method: "GET", pattern: /^by-cve\/(CVE-[0-9]{4}-[0-9]{4,19})$/ },
   { method: "GET", pattern: new RegExp(`^${UUID}$`) },
@@ -68,16 +69,29 @@ async function readBody(request: NextRequest): Promise<string | null> {
   }
 }
 
-export async function proxyLearning(
+export type LearnerProxyConfig = {
+  /** The backend path prefix, e.g. "/api/learning". */
+  apiPrefix: string;
+  /** The only method + path combinations that are forwarded. */
+  routes: LearnerRoute[];
+  /** The only upstream status codes let through (everything else becomes a generic 503). */
+  passThrough: ReadonlySet<number>;
+};
+
+/**
+ * Forward an allow-listed call to the backend on behalf of the anonymous learner (cookie -> header).
+ * Shared by the learning and sandbox proxies, so identity, origin checks and error sanitising are
+ * one piece of code.
+ */
+export async function proxyLearner(
   request: NextRequest,
+  config: LearnerProxyConfig,
   segments: string[] | undefined,
   method: "GET" | "POST",
 ): Promise<NextResponse> {
   const path = (segments ?? []).join("/");
-  const allowed = ROUTES.some((r) => r.method === method && r.pattern.test(path));
+  const allowed = config.routes.some((r) => r.method === method && r.pattern.test(path));
   if (!allowed || (segments ?? []).some((s) => s.length > 60)) return problem(404, "not_found", "Not found.");
-  const byCve = /^by-cve\/(.+)$/.exec(path);
-  if (byCve && !normalizeCveId(byCve[1]!)) return problem(404, "not_found", "Not found.");
   if (method === "POST" && !isSameOrigin(request)) {
     return problem(403, "forbidden", "Cross-site requests are not allowed.");
   }
@@ -104,7 +118,11 @@ export async function proxyLearning(
 
   let response: NextResponse;
   try {
-    response = await forward(`${backendUrl()}/api/learning${path ? `/${path}` : ""}`, init);
+    response = await forward(
+      `${backendUrl()}${config.apiPrefix}${path ? `/${path}` : ""}`,
+      init,
+      config.passThrough,
+    );
   } catch {
     response = problem(503, "unavailable", "The API could not be reached.");
   }
@@ -112,9 +130,29 @@ export async function proxyLearning(
   return response;
 }
 
-async function forward(url: string, init: RequestInit): Promise<NextResponse> {
+export async function proxyLearning(
+  request: NextRequest,
+  segments: string[] | undefined,
+  method: "GET" | "POST",
+): Promise<NextResponse> {
+  const path = (segments ?? []).join("/");
+  const byCve = /^by-cve\/(.+)$/.exec(path);
+  if (byCve && !normalizeCveId(byCve[1]!)) return problem(404, "not_found", "Not found.");
+  return proxyLearner(
+    request,
+    { apiPrefix: "/api/learning", routes: ROUTES, passThrough: LEARNING_PASS_THROUGH },
+    segments,
+    method,
+  );
+}
+
+async function forward(
+  url: string,
+  init: RequestInit,
+  passThrough: ReadonlySet<number>,
+): Promise<NextResponse> {
   const upstream = await fetch(url, init);
-  if (!PASS_THROUGH.has(upstream.status)) {
+  if (!passThrough.has(upstream.status)) {
     return problem(503, "unavailable", "The API is not available right now.");
   }
   let body: unknown;

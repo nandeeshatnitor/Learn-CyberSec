@@ -257,10 +257,18 @@ describe("learning workspace", () => {
     expect(screen.queryByTestId("learn-error")).toBeNull();
   });
 
+  it("shows no lab card when labs are not enabled on the server", async () => {
+    installFakeLearningApi();
+    render(<LearningWorkspace cveId={CVE} />);
+    await start(setup());
+    expect(screen.queryByTestId("labs-card")).toBeNull();
+    expect(screen.getByTestId("workspace")).toBeInTheDocument(); // the lesson itself is unaffected
+  });
+
   it("only talks to this site's own learning routes", async () => {
     const api = installFakeLearningApi();
     render(<LearningWorkspace cveId={CVE} />);
     await start(setup());
-    for (const call of api.calls) expect(call.path).toMatch(/^\/api\/(learning|cves\/CVE-2099-12345\/research\/status)/);
+    for (const call of api.calls) expect(call.path).toMatch(/^\/api\/(learning|sandbox|cves\/CVE-2099-12345\/research\/status)/);
   });
 });

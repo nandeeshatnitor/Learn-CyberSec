@@ -1,9 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SessionView } from "@/lib/learning-types";
+import type { SessionLabs } from "@/lib/sandbox-types";
 import { formatDateTime } from "@/lib/format";
 
-export function Summary({ session }: { session: SessionView }) {
+export function Summary({ session, labs }: { session: SessionView; labs?: SessionLabs | null }) {
   return (
     <Card data-testid="summary">
       <CardHeader>
@@ -44,6 +45,21 @@ export function Summary({ session }: { session: SessionView }) {
             </li>
           ))}
         </ul>
+        {labs && labs.labs.length > 0 && (
+          <div className="space-y-1 border-t pt-3 text-sm" data-testid="summary-labs">
+            <p className="font-medium">Hands-on practice</p>
+            <ul className="space-y-1">
+              {labs.labs.map((entry) => (
+                <li key={entry.lab.id} className="flex items-center justify-between gap-2">
+                  <span>{entry.lab.title}</span>
+                  <Badge variant={entry.verified === entry.total ? "default" : "muted"}>
+                    {entry.verified} of {entry.total} objectives verified
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {session.solution_revealed && (
           <p className="text-xs text-muted-foreground">
             At least one solution was revealed. Revisit those tasks and try to explain them in your own words.

@@ -72,3 +72,33 @@ class LearningStatus(enum.StrEnum):
 
 
 ACTIVE_LEARNING_STATUSES = (LearningStatus.NOT_STARTED, LearningStatus.IN_PROGRESS)
+
+
+class LabStatus(enum.StrEnum):
+    """Lifecycle of one lab instance (a disposable container plus its private network)."""
+
+    STARTING = "starting"
+    RUNNING = "running"
+    EXPIRED = "expired"  # the lease ran out; the resources are still to be removed
+    STOPPING = "stopping"
+    STOPPED = "stopped"  # terminal: the resources are gone
+    FAILED = "failed"  # terminal: it never became usable (the resources are removed as well)
+
+
+# Instances that still hold (or are about to release) runtime resources. A learner may have one.
+LIVE_LAB_STATUSES = (
+    LabStatus.STARTING,
+    LabStatus.RUNNING,
+    LabStatus.EXPIRED,
+    LabStatus.STOPPING,
+)
+
+# Allowed lifecycle moves; anything else is a bug and is refused by the repository.
+LAB_TRANSITIONS: dict[LabStatus, frozenset[LabStatus]] = {
+    LabStatus.STARTING: frozenset({LabStatus.RUNNING, LabStatus.FAILED, LabStatus.STOPPING}),
+    LabStatus.RUNNING: frozenset({LabStatus.EXPIRED, LabStatus.STOPPING, LabStatus.FAILED}),
+    LabStatus.EXPIRED: frozenset({LabStatus.STOPPING}),
+    LabStatus.STOPPING: frozenset({LabStatus.STOPPED, LabStatus.FAILED}),
+    LabStatus.STOPPED: frozenset(),
+    LabStatus.FAILED: frozenset(),
+}

@@ -1,0 +1,2 @@
+Welcome to DocViewer!
+This portal shares company documents. Pick one from the list on the home page.

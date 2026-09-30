@@ -59,6 +59,10 @@ known-third-party = ["alembic"]  # not the local ./alembic migrations directory
 "app/research/classify.py" = ["E501"]
 # Prompt/hint wording tables and word lists.
 "app/learning/*.py" = ["E501", "SIM905"]
+# User-facing message strings and shell/argv tables.
+"app/sandbox/*.py" = ["E501"]
+"app/api/routes/sandbox.py" = ["E501"]
+"tests/sandbox/**" = ["E501", "S101", "S105", "S106", "S108", "S603", "S607"]
 
 [tool.mypy]
 python_version = "3.11"

@@ -1,0 +1,70 @@
+{
+  "id": "path-traversal-101",
+  "version": "1",
+  "title": "Path traversal in a document portal",
+  "summary": "A tiny document portal serves files from one folder. Show that it can be tricked into serving a file from outside that folder, then fix the code without breaking the portal.",
+  "cve_id": null,
+  "cwe_ids": ["CWE-22"],
+  "difficulty": "beginner",
+  "image": "cvelearn-lab/path-traversal-101:1",
+  "ports": [{"name": "app", "container_port": 8080, "protocol": "http"}],
+  "startup_command": ["/opt/lab/start.sh"],
+  "shell": ["/bin/sh"],
+  "user": "10001:10001",
+  "timeout_minutes": 45,
+  "resources": {"cpus": 0.5, "memory_mb": 128, "pids": 64, "tmpfs_mb": 16},
+  "writable_paths": ["/tmp", "/lab"],
+  "network": {"egress": "none"},
+  "instructions": [
+    "Open the portal (the Lab app tab, or `wget -qO- http://localhost:8080/` in the terminal) and look at how documents are requested.",
+    "The portal's code is in /lab/app/server.py. Read `read_document` and ask what happens to the `name` you send.",
+    "The portal must only serve files inside /lab/docs. This lab hides a per-lab secret in a file *outside* that folder. Find a request that makes the portal return it.",
+    "Submit that request path for verification. The check replays it against the running portal and looks for this lab's secret in the answer.",
+    "Now fix the code in /lab/app/server.py, keeping legitimate documents (including ones in sub-folders) working. Restart the portal with `sh /opt/lab/restart.sh`, then verify the fix.",
+    "Everything here is disposable: use Reset lab for a fresh copy of the vulnerable portal at any time."
+  ],
+  "safety_notes": [
+    "This lab is an intentionally vulnerable toy application running in a sealed container with no network access.",
+    "Do not use these techniques against systems you do not own or have written permission to test."
+  ],
+  "verification": {
+    "ready": {"port": "app", "path": "/health", "status": 200, "timeout_seconds": 30},
+    "restart_command": ["sh", "/opt/lab/restart.sh"],
+    "checks": [
+      {
+        "id": "exploit",
+        "kind": "payload_replay",
+        "title": "Read a file outside the documents folder",
+        "description": "Submit a request path that makes the portal return this lab's private secret.",
+        "port": "app",
+        "input_label": "Request path",
+        "input_hint": "/download?name=..."
+      },
+      {
+        "id": "remediate",
+        "kind": "regression",
+        "title": "Fix the vulnerability",
+        "description": "After your fix, the portal must refuse the attack (yours and the usual variants) and still serve real documents.",
+        "port": "app",
+        "requires": ["exploit"],
+        "restart": true,
+        "replay_from": ["exploit"],
+        "block_paths": [
+          "/download?name=../private/canary.txt",
+          "/download?name=../../lab/private/canary.txt",
+          "/download?name=guides/../../private/canary.txt",
+          "/download?name=%2e%2e/private/canary.txt",
+          "/download?name=..%2fprivate%2fcanary.txt",
+          "/download?name=/lab/private/canary.txt",
+          "/download?name=....//private/canary.txt"
+        ],
+        "keep_working": [
+          {"path": "/health", "status_in": [200], "body_contains": "ok"},
+          {"path": "/download?name=welcome.txt", "status_in": [200], "body_contains": "Welcome to DocViewer"},
+          {"path": "/download?name=guides/setup.txt", "status_in": [200], "body_contains": "Setup guide"},
+          {"path": "/download?name=does-not-exist.txt", "status_in": [400, 403, 404]}
+        ]
+      }
+    ]
+  }
+}

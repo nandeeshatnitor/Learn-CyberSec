@@ -3,12 +3,15 @@ from app.services.errors import (
     ConflictError,
     DomainError,
     InvalidInputError,
+    LabCapacityError,
+    LabStartFailedError,
     LearningDisabledError,
     NotFoundError,
     ProvidersUnavailableError,
     RateLimitedError,
     ResearchDisabledError,
     ResearchUnavailableError,
+    SandboxDisabledError,
     UnauthorizedError,
 )
 from app.services.health_service import HealthService
@@ -22,6 +25,8 @@ __all__ = [
     "DomainError",
     "HealthService",
     "InvalidInputError",
+    "LabCapacityError",
+    "LabStartFailedError",
     "LearningConfig",
     "LearningDisabledError",
     "LearningService",
@@ -33,6 +38,7 @@ __all__ = [
     "ResearchRunner",
     "ResearchService",
     "ResearchUnavailableError",
+    "SandboxDisabledError",
     "SourceService",
     "UnauthorizedError",
 ]

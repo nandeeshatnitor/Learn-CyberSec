@@ -11,6 +11,11 @@ export function SiteHeader() {
             CVE Learning <span className="text-primary">Explorer</span>
           </span>
         </Link>
+        <nav aria-label="Main">
+          <Link href="/labs" className="text-sm text-muted-foreground hover:text-foreground">
+            Labs
+          </Link>
+        </nav>
       </div>
     </header>
   );

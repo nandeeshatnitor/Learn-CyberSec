@@ -44,6 +44,8 @@ export interface FakeOptions {
   existing?: "none" | "not_started" | "in_progress";
   tutor?: (question: string, taskId: string | null) => TutorReplyView;
   fail?: Partial<Record<string, { status: number; code: string; message: string }>>;
+  /** Serves /api/sandbox/*; by default labs are "not enabled", exactly like a server without Docker. */
+  sandbox?: (url: URL, init?: RequestInit) => Promise<Response>;
 }
 
 export interface FakeApi {
@@ -118,6 +120,9 @@ export function installFakeLearningApi(options: FakeOptions = {}): FakeApi {
     const forced = options.fail?.[key];
     if (forced) return err(forced.status, forced.code, forced.message);
 
+    if (url.pathname.startsWith("/api/sandbox")) {
+      return options.sandbox ? options.sandbox(url, init) : err(503, "sandbox_disabled", "Labs are not enabled on this server.");
+    }
     if (url.pathname.endsWith("/research/status")) {
       const guide = options.guideAvailable ?? true;
       return reply(200, { cve_id: CVE, status: guide ? "ready" : "not_started", stage: guide ? "Ready" : "No learning guide", guide_available: guide });

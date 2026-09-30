@@ -57,6 +57,7 @@ function problemFrom(status: number, body: unknown, retryAfter: string | null): 
       retryAfter: Number.isFinite(seconds) && seconds > 0 ? seconds : undefined,
     };
   }
+  if (code === "sandbox_disabled") return { kind: "disabled", message: "Labs are not enabled on this server." };
   if (code === "research_disabled") return { kind: "disabled", message: "Learning-guide generation is turned off on this server." };
   return { kind: "unavailable", message: message || "The service is not available right now." };
 }

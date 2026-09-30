@@ -13,12 +13,15 @@ from app.services import (
     ConflictError,
     DomainError,
     InvalidInputError,
+    LabCapacityError,
+    LabStartFailedError,
     LearningDisabledError,
     NotFoundError,
     ProvidersUnavailableError,
     RateLimitedError,
     ResearchDisabledError,
     ResearchUnavailableError,
+    SandboxDisabledError,
     UnauthorizedError,
 )
 from app.utils.logging import get_logger
@@ -35,6 +38,9 @@ _DOMAIN_STATUS = {
     ConflictError: 409,
     UnauthorizedError: 401,
     LearningDisabledError: 503,
+    SandboxDisabledError: 503,
+    LabCapacityError: 503,
+    LabStartFailedError: 502,
 }
 
 

@@ -5,12 +5,15 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { HintsPanel, SourcesPanel, TutorPanel } from "@/components/learn/side-panels";
+import { LabsCard } from "@/components/learn/labs-card";
 import { ProgressPanel } from "@/components/learn/progress-panel";
 import { Summary } from "@/components/learn/summary";
 import { TaskPanel, type Feedback } from "@/components/learn/task-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import * as api from "@/lib/learning-client";
+import * as sandbox from "@/lib/sandbox-client";
+import type { SessionLabs } from "@/lib/sandbox-types";
 import type { HintView, SessionView, SolutionView, TutorTurn } from "@/lib/learning-types";
 import { fetchStatus } from "@/lib/research-client";
 import type { ResearchProblem } from "@/lib/research-types";
@@ -38,6 +41,7 @@ export function LearningWorkspace({ cveId }: { cveId: string }) {
   const [viewTask, setViewTask] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [labs, setLabs] = useState<SessionLabs | null>(null);
   const alive = useRef(true);
 
   /** Take a new session state. `stay` keeps the student on the task they just finished so they can
@@ -99,6 +103,20 @@ export function LearningWorkspace({ cveId }: { cveId: string }) {
       alive.current = false;
     };
   }, [cveId, loadDetails]);
+
+  // Hands-on labs that fit this lesson, with the objectives verified so far. Optional: when labs are
+  // not enabled (or none fit) this simply stays empty and the lesson works exactly as before.
+  const sessionId = session?.id ?? null;
+  useEffect(() => {
+    if (!sessionId || phase.kind !== "session") return;
+    let live = true;
+    void sandbox.sessionLabs(sessionId).then((result) => {
+      if (live && result.ok) setLabs(result.data);
+    });
+    return () => {
+      live = false;
+    };
+  }, [sessionId, phase.kind]);
 
   async function run<T>(label: string, action: () => Promise<api.Outcome<T>>, onOk: (data: T) => void) {
     setBusy(label);
@@ -205,10 +223,11 @@ export function LearningWorkspace({ cveId }: { cveId: string }) {
           {error}
         </p>
       )}
-      {session.status === "completed" && <Summary session={session} />}
+      {session.status === "completed" && <Summary session={session} labs={labs} />}
       <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)_340px]" data-testid="workspace">
-        <aside aria-label="Objectives and progress">
+        <aside className="space-y-4" aria-label="Objectives and progress">
           <ProgressPanel session={session} activeId={active?.id ?? null} onSelect={setViewTask} />
+          <LabsCard labs={labs} sessionId={session.id} cveId={cveId} />
         </aside>
 
         <main className="min-w-0 space-y-4">

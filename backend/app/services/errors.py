@@ -59,3 +59,19 @@ class UnauthorizedError(DomainError):
 
 class LearningDisabledError(DomainError):
     code = "learning_disabled"
+
+
+class SandboxDisabledError(DomainError):
+    code = "sandbox_disabled"
+
+
+class LabCapacityError(DomainError):
+    """Every lab slot is in use right now."""
+
+    code = "lab_capacity"
+
+
+class LabStartFailedError(DomainError):
+    """A lab could not be started. The message is one of a fixed set, never runtime output."""
+
+    code = "lab_start_failed"
