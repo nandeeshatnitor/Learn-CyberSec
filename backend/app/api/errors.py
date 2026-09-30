@@ -1,5 +1,6 @@
 """Uniform JSON error responses: {"error": {"code", "message", "request_id", ...}}."""
 
+import math
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -8,12 +9,23 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.schemas import ErrorBody, ErrorResponse
-from app.services import DomainError, InvalidInputError, NotFoundError
+from app.services import (
+    DomainError,
+    InvalidInputError,
+    NotFoundError,
+    ProvidersUnavailableError,
+    RateLimitedError,
+)
 from app.utils.logging import get_logger
 
 log = get_logger(__name__)
 
-_DOMAIN_STATUS = {NotFoundError: 404, InvalidInputError: 422}
+_DOMAIN_STATUS = {
+    NotFoundError: 404,
+    InvalidInputError: 422,
+    ProvidersUnavailableError: 503,
+    RateLimitedError: 429,
+}
 
 
 def _response(
@@ -22,6 +34,7 @@ def _response(
     code: str,
     message: str,
     details: list[dict[str, Any]] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     body = ErrorResponse(
         error=ErrorBody(
@@ -31,10 +44,25 @@ def _response(
             details=details,
         )
     )
-    return JSONResponse(status_code=status, content=body.model_dump(exclude_none=True))
+    return JSONResponse(
+        status_code=status, content=body.model_dump(exclude_none=True), headers=headers
+    )
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(RateLimitedError)
+    async def handle_rate_limited(request: Request, exc: RateLimitedError) -> JSONResponse:
+        retry_after = str(max(1, math.ceil(exc.retry_after)))
+        return _response(request, 429, exc.code, exc.message, headers={"Retry-After": retry_after})
+
+    @app.exception_handler(ProvidersUnavailableError)
+    async def handle_providers_unavailable(
+        request: Request, exc: ProvidersUnavailableError
+    ) -> JSONResponse:
+        # Provider statuses use fixed, safe messages: no URLs, bodies or credentials.
+        details = [p.model_dump(mode="json", exclude_none=True) for p in exc.providers]
+        return _response(request, 503, exc.code, exc.message, details)
+
     @app.exception_handler(DomainError)
     async def handle_domain_error(request: Request, exc: DomainError) -> JSONResponse:
         return _response(request, _DOMAIN_STATUS.get(type(exc), 400), exc.code, exc.message)

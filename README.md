@@ -1,22 +1,29 @@
 # CVE Learning Explorer
 
-A cybersecurity learning platform. A student searches for a CVE and gets a structured lesson:
-what the vulnerability is, who is affected, how it works, how to reproduce it in an authorised
-local lab, what evidence shows success, why it happens, how to fix it, and the original sources
-behind every claim.
+A cybersecurity learning platform. A student searches for a CVE and gets structured, attributed
+vulnerability information from public databases, and (in later phases) a lesson: how it works, how to
+reproduce it in an authorised local lab, and how to fix it.
 
 > **Educational use only.** Only test systems you own or have explicit written permission to
 > test. Everything from external sources is treated as untrusted input.
 
-## Status: Phase 0 (foundation)
+## Status: Phase 1 (authoritative vulnerability data)
 
-Implemented: monorepo, FastAPI API, PostgreSQL schema + Alembic migrations, Redis wiring,
-Next.js UI with placeholder sections, Docker Compose, tests.
+You can open the site, search for a CVE (by ID, part of an ID, keyword, product or vendor), open
+it, and see metadata retrieved from **NVD**, **MITRE / CVE Program** and the **CISA KEV
+catalogue**: description, CVSS, severity, CWEs, affected software and versions, known-exploitation
+status, dates and the original references. Every section says which source it came from, and the
+site says that it *retrieved* the data and did *not independently verify* it. If one provider is
+down the site keeps working with the others (and with cached or stored copies, labelled as such).
 
-**Not implemented yet (later phases):** retrieval from NVD/MITRE/vendor/CISA/etc., learning-guide
-generation, hints, sandbox labs, users/progress. The UI states clearly when information is
-*unavailable* rather than inventing it, and the few sample CVEs in the database are flagged as
-hand-entered, unverified seed data. See [docs/roadmap.md](docs/roadmap.md).
+**Not implemented yet (later phases):** learning guides / LLM-generated content, reproduction
+guides, hints, sandbox labs, users and progress. Those sections show as "Not available". See
+[docs/roadmap.md](docs/roadmap.md) and [docs/providers.md](docs/providers.md).
+
+> **Verify against the real APIs.** The automated tests use hand-written fixtures and never touch
+> the network; the adapters were built without access to the live services. Run
+> `make verify-providers` once on a machine with internet access (see
+> [docs/providers.md](docs/providers.md#verifying-against-the-real-apis)).
 
 ## Layout
 
@@ -24,15 +31,17 @@ hand-entered, unverified seed data. See [docs/roadmap.md](docs/roadmap.md).
 frontend/         Next.js (App Router) + TypeScript + Tailwind + shadcn/ui-style components
 backend/          FastAPI, Pydantic, SQLAlchemy, Alembic
   app/api/          HTTP layer only (routes, error handlers, middleware)
-  app/services/     business logic
+  app/services/     business logic (lookup/search orchestration, merging)
+  app/integrations/ provider adapters (nvd/, mitre/, cisa_kev/), HTTP client, cache/limit wrapper
+  app/cache/        Redis cache, sliding-window rate limiter, in-process fallbacks
   app/repositories/ database access
-  app/models/       ORM models       app/schemas/  Pydantic API models
-  app/integrations/ external sources (empty until Phase 1)
-  app/workers/      background jobs (empty until Phase 1)
+  app/models/       ORM models       app/schemas/  normalised, provider-independent schemas
+  app/workers/      background jobs (empty until needed)
 services/         future standalone services (see services/README.md)
 infrastructure/   deployment/infra assets
-docs/             architecture, data model, security, roadmap
-scripts/          helper scripts     tests/  cross-service smoke test
+docs/             architecture, providers, data model, security, roadmap
+scripts/          helper scripts (env setup, live provider check, fake providers)
+tests/            cross-service smoke test
 ```
 
 ## Quick start (Docker)
@@ -47,14 +56,15 @@ make up         # postgres, redis, migrations, backend, frontend
 - Web app: http://localhost:3000
 - API: http://localhost:8000/api/health (interactive docs at `/api/docs` in development)
 
-Load the sample records (optional), then verify everything end-to-end:
-
-```bash
-docker compose run --rm backend python -m app.database.seed
-make smoke
-```
+Then open http://localhost:3000, search for `CVE-2021-44228` or `log4j`, and select a result.
+Verify the stack end to end with `make smoke`.
 
 `make down` stops the stack; `docker compose down -v` also deletes the database volume.
+
+**Optional NVD API key.** Without one NVD allows 5 requests per 30 s; the platform stays inside
+that (and caches heavily). To raise it to 50, [request a key](https://nvd.nist.gov/developers/request-an-api-key)
+and put it in `.env` as `NVD_API_KEY=...`. It is used only by the backend, only sent to NVD in a
+request header, and never exposed to the browser or logs.
 
 ## Host-based development
 
@@ -65,10 +75,14 @@ two with `docker compose up -d db redis`).
 make setup                  # .env (DATABASE_URL / REDIS_URL point at localhost)
 make install                # backend venv + frontend node_modules
 make migrate                # alembic upgrade head
-make seed                   # optional sample CVEs
 make backend-dev            # terminal 1: http://localhost:8000
 make frontend-dev           # terminal 2: http://localhost:3000
 ```
+
+Working offline (or want to watch a provider fail)? `make fake-providers` serves fake
+NVD/MITRE/KEV APIs on localhost; the values to put in `.env` are in `scripts/fake_providers.py`.
+`make seed` loads a few hand-entered sample CVEs that are shown only as a last-resort fallback,
+clearly labelled "Development sample record".
 
 ## Tests and checks
 
@@ -77,36 +91,65 @@ make test        # backend (pytest) + frontend (vitest)
 make lint        # ruff + eslint
 make typecheck   # mypy + tsc
 make smoke       # against a running stack
+make verify-providers   # against the REAL NVD / MITRE / CISA APIs (needs internet)
 ```
 
-Backend tests use in-memory SQLite by default. To run them on PostgreSQL, create a *dedicated*
-database whose name ends in `_test` and set `TEST_DATABASE_URL` (its tables are dropped after each
-test; the suite refuses any other name):
+Backend tests use in-memory SQLite and mocked HTTP by default. To run them on PostgreSQL, create a
+*dedicated* database whose name ends in `_test` and set `TEST_DATABASE_URL` (its tables are
+dropped after each test; the suite refuses any other name). Set `REDIS_TEST_URL` to also run the
+real-Redis tests (cache expiry, the Lua rate limiter shared across workers):
 
 ```bash
-TEST_DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/cvelearn_test make test-backend
+TEST_DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/cvelearn_test \
+REDIS_TEST_URL=redis://:pass@localhost:6379/0 make test-backend
 ```
 
-## API (Phase 0)
+## API
 
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/api/health` | Liveness + database/Redis status. 503 if the database is down. |
-| GET | `/api/cves/{cve_id}` | 404 if not in the local DB, 422 if the ID is malformed. |
-| GET | `/api/cves/search?q=&limit=&offset=` | Literal substring search over stored CVE IDs/descriptions. |
-| GET | `/api/sources/{source_id}` | Source by UUID. |
+| GET | `/api/health/providers` | Active probe of NVD / MITRE / KEV (cached 60 s). One failing provider does not make the API unhealthy. |
+| GET | `/api/cves/{cve_id}` | Normalised record from all providers, merged, with attribution. 404 unknown, 422 malformed, 503 no provider reachable and no stored copy. |
+| GET | `/api/cves/search?q=&page=&limit=&severity=&known_exploited=` | Exact ID, partial ID, keyword, product, vendor. `severity` = LOW/MEDIUM/HIGH/CRITICAL, `known_exploited=true` = CISA KEV only. |
+| GET | `/api/sources/{source_id}` | Stored source by UUID. |
 
-Errors share one shape: `{"error": {"code", "message", "request_id", "details?"}}`.
+Response shape (abridged):
+
+```json
+{
+  "cve_id": "CVE-2021-44228",
+  "description": "…",
+  "severity": "CRITICAL",
+  "cvss": {"score": 10.0, "vector": "CVSS:3.1/…", "version": "3.1", "source": "nvd", "primary": true},
+  "cvss_metrics": [],
+  "cwes": [{"id": "CWE-502", "name": null, "sources": ["nvd", "mitre"]}],
+  "affected_products": [{"vendor": "apache", "product": "log4j", "source": "nvd", "versions": []}],
+  "references": [{"url": "https://…", "title": null, "tags": [], "sources": ["nvd"]}],
+  "published_at": "2021-12-10T10:15:09.143Z",
+  "modified_at": "2025-05-05T17:15:00Z",
+  "known_exploited": true,
+  "kev": {"source": "cisa_kev", "date_added": "2021-12-10"},
+  "sources": [{"provider": "nvd", "name": "NVD", "url": "https://nvd.nist.gov/…", "retrieved_at": "…", "stale": false}],
+  "field_sources": {"description": ["nvd"], "known_exploited": ["cisa_kev"]},
+  "meta": {"served_from": "providers", "warnings": [], "providers": [{"provider": "nvd", "status": "ok"}]}
+}
+```
+
+`known_exploited` is `null` (unknown) when the KEV catalogue could not be consulted, never a
+guessed `false`. Errors share one shape: `{"error": {"code", "message", "request_id", "details?"}}`.
 
 ## Configuration
 
 All configuration is via environment variables; see [.env.example](.env.example). There are no
-hardcoded secrets or API keys, and `DATABASE_URL` has no default. The frontend only reads
-`BACKEND_URL` on the server; nothing backend-related is exposed to the browser.
+hardcoded secrets or API keys, and `DATABASE_URL` has no default. Provider credentials live only
+in the backend. The frontend only reads `BACKEND_URL` on the server; nothing backend-related is
+exposed to the browser.
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Data providers, caching and rate limiting](docs/providers.md)
 - [Data model](docs/data-model.md)
 - [Security design](docs/security.md)
 - [Roadmap](docs/roadmap.md)

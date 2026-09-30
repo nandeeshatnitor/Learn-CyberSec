@@ -9,6 +9,17 @@ x-backend-env: &backend-env
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?set POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:?set POSTGRES_DB in .env}
   REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
   CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-3000},http://127.0.0.1:${FRONTEND_PORT:-3000}
+  # Providers: credentials stay in the backend containers only.
+  ENABLED_PROVIDERS: ${ENABLED_PROVIDERS:-nvd,mitre,cisa_kev}
+  NVD_API_KEY: ${NVD_API_KEY:-}
+  CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-21600}
+  CACHE_STALE_TTL_SECONDS: ${CACHE_STALE_TTL_SECONDS:-604800}
+  CACHE_SEARCH_TTL_SECONDS: ${CACHE_SEARCH_TTL_SECONDS:-900}
+  KEV_CACHE_TTL_SECONDS: ${KEV_CACHE_TTL_SECONDS:-21600}
+  API_RATE_LIMIT_REQUESTS: ${API_RATE_LIMIT_REQUESTS:-60}
+  API_RATE_LIMIT_WINDOW_SECONDS: ${API_RATE_LIMIT_WINDOW_SECONDS:-60}
+  # The web app (a private-network peer) forwards each visitor's address in X-Forwarded-For.
+  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
 
 services:
   db:

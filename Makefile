@@ -4,7 +4,7 @@ PY    := $(VENV)/bin/python
 
 .DEFAULT_GOAL := help
 .PHONY: help setup install up down logs migrate seed backend-dev frontend-dev \
-        test test-backend test-frontend lint typecheck smoke
+        test test-backend test-frontend lint typecheck smoke verify-providers fake-providers
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -56,6 +56,12 @@ lint: ## Lint and format-check both projects
 typecheck: ## Static type checks
 	cd backend && ../$(VENV)/bin/mypy
 	cd frontend && npm run typecheck
+
+verify-providers: ## Check the adapters against the REAL NVD/MITRE/KEV APIs (needs internet). ARGS="CVE-... --record DIR"
+	$(PY) scripts/verify_providers.py $(ARGS)
+
+fake-providers: ## Serve fake NVD/MITRE/KEV APIs on localhost:9101-9103 (dev only, see scripts/fake_providers.py)
+	python3 scripts/fake_providers.py
 
 smoke: ## End-to-end check against a running stack (BACKEND_URL / FRONTEND_URL)
 	python3 tests/smoke_test.py
