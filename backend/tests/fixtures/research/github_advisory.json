@@ -1,0 +1,5 @@
+[{"ghsa_id": "GHSA-acme-2099-abcd", "cve_id": "CVE-2099-12345", "html_url": "https://github.com/advisories/GHSA-acme-2099-abcd",
+  "summary": "AcmeDocs template engine allows expression injection via X-Template-Hint header",
+  "description": "AcmeDocs evaluates expressions supplied in the `X-Template-Hint` request header when the preview feature is enabled. This can lead to remote code execution (CVE-2099-12345).\n\n### Patches\nFixed in AcmeDocs 4.2.4.\n\n### Workarounds\nDisable the preview feature.",
+  "severity": "critical",
+  "vulnerabilities": [{"package": {"ecosystem": "maven", "name": "com.acme:acmedocs"}, "vulnerable_version_range": ">= 4.0.0, < 4.2.4", "first_patched_version": "4.2.4"}]}]

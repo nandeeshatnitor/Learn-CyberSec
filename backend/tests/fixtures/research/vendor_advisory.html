@@ -1,0 +1,14 @@
+<!doctype html><html><head><title>AcmeDocs Security Advisory ACME-SA-2099-01 | Acme Corp</title></head>
+<body><header class="site-header"><nav><a href="/">Home</a><a href="/products">Products</a></nav></header>
+<main><article>
+<h1>ACME-SA-2099-01: Remote code execution in AcmeDocs template engine (CVE-2099-12345)</h1>
+<p>AcmeDocs versions 4.0.0 through 4.2.3 are affected by CVE-2099-12345. Versions before 4.0.0 and version 4.2.4 and later are not affected.</p>
+<h2>Description</h2>
+<p>The vulnerability is caused by the template renderer evaluating expressions found in the <code>X-Template-Hint</code> request header without sanitizing them. An unauthenticated attacker with network access to an exposed AcmeDocs server can execute arbitrary code.</p>
+<h2>Prerequisites</h2>
+<p>The server must have the optional "preview" feature enabled, which is disabled by default in AcmeDocs 4.2.x but enabled by default in 4.0.x and 4.1.x.</p>
+<h2>Remediation</h2>
+<p>Upgrade to AcmeDocs 4.2.4 or later. As a workaround, disable the preview feature by setting <code>preview.enabled=false</code> in acme.conf and restart the service.</p>
+<div class="share-buttons">Share on Twitter Share on LinkedIn</div>
+</article></main>
+<footer>Copyright 2099 Acme Corp. All rights reserved. Privacy policy</footer></body></html>

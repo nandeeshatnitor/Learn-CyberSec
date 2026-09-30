@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, string_enum
-from app.models.enums import ReliabilityLevel, SourceType
+from app.models.enums import ReliabilityLevel, SourceStatus, SourceType
 
 if TYPE_CHECKING:
     from app.models.cve import CVEReference
@@ -25,6 +25,14 @@ class Source(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     reliability_level: Mapped[ReliabilityLevel] = mapped_column(
         string_enum(ReliabilityLevel), nullable=False, default=ReliabilityLevel.UNVERIFIED
     )
+
+    # Furthest pipeline stage this source reached the last time it was researched.
+    status: Mapped[SourceStatus] = mapped_column(
+        string_enum(SourceStatus), nullable=False, default=SourceStatus.DISCOVERED
+    )
+    # SHA-256 of the normalised extracted text at retrieval. The page itself is never stored; the
+    # hash detects change and lets duplicates be recognised.
+    content_hash: Mapped[str | None] = mapped_column(String(64))
 
     references: Mapped[list["CVEReference"]] = relationship(back_populates="source")
 

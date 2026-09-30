@@ -16,6 +16,8 @@ def _source(url: str) -> dict[str, object]:
         "publisher": None,
         "retrieved_at": datetime.now(UTC),
         "reliability_level": "official",
+        "status": "discovered",
+        "content_hash": None,
     }
 
 

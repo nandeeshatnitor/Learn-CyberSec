@@ -14,6 +14,9 @@ dependencies = [
     "redis>=5.0,<7",
     "structlog>=24.1",
     "httpx2>=2,<3",
+    "beautifulsoup4>=4.12,<5",
+    "anthropic>=1,<2",
+    "rq>=2,<3",
 ]
 
 [project.optional-dependencies]
@@ -50,6 +53,10 @@ known-third-party = ["alembic"]  # not the local ./alembic migrations directory
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106"]
+# Pattern tables read better one entry per line than wrapped.
+"app/research/injection.py" = ["E501"]
+"app/research/facets.py" = ["E501"]
+"app/research/classify.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"

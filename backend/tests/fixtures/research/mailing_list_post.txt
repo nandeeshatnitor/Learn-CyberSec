@@ -1,0 +1,10 @@
+Subject: Re: [oss-security] CVE-2099-12345 AcmeDocs template injection
+
+> On Tue, someone wrote:
+> AcmeDocs 4.2.3 is vulnerable, can anyone confirm the root cause?
+
+Confirmed. The root cause is in TemplateRenderer.resolveHint(), which passes the raw X-Template-Hint header to the expression evaluator. There is no allow-list check on the header value in 4.2.3 and earlier.
+
+    curl -H 'X-Template-Hint: ${7*7}' http://127.0.0.1:8080/preview
+
+The fix in 4.2.4 restricts hint values to a fixed set of template names.

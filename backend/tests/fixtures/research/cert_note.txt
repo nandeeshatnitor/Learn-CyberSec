@@ -1,0 +1,15 @@
+Vulnerability Note VU#990099
+
+AcmeDocs template engine expression injection
+
+Overview
+
+AcmeDocs versions 4.0.0 through 4.2.3 contain an expression injection vulnerability, tracked as CVE-2099-12345. A remote, unauthenticated attacker may be able to execute arbitrary code on the server.
+
+Impact
+
+An attacker who can reach a vulnerable AcmeDocs server with the preview feature enabled may execute code with the privileges of the AcmeDocs service.
+
+Solution
+
+Apply the update to AcmeDocs 4.2.4. Administrators who cannot update should disable the preview feature.

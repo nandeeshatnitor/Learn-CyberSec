@@ -1,0 +1,17 @@
+<!doctype html><html><head><title>Dissecting CVE-2099-12345: template injection in AcmeDocs | Example Security Blog</title></head>
+<body><header><nav><a href="/">Home</a><a href="/about">About</a><a href="/archive">Archive</a></nav></header>
+<div class="cookie-banner">We use cookies to improve your experience. Accept all cookies</div>
+<article><h1>Dissecting CVE-2099-12345: template injection in AcmeDocs</h1>
+<p>In this post we walk through CVE-2099-12345, a template injection flaw in AcmeDocs 4.2.3 and earlier. The bug exists because the renderer does not sanitize the value of the X-Template-Hint header before evaluating it as an expression.</p>
+<h2>Setting up a lab</h2>
+<p>To reproduce this safely, use the intentionally vulnerable Docker image published by the AcmeDocs project. Do not test against systems you do not own.</p>
+<pre>docker run --rm -p 127.0.0.1:8080:8080 acmedocs/vulnerable:4.2.3</pre>
+<h2>Steps to reproduce</h2>
+<ul><li>Start the vulnerable container as shown above and wait for the log line "AcmeDocs ready".</li>
+<li>Send a request to the preview endpoint with a crafted X-Template-Hint header.</li></ul>
+<pre>curl -H 'X-Template-Hint: ${7*7}' http://127.0.0.1:8080/preview</pre>
+<p>If the server is vulnerable, the response body contains the number 49, which confirms the expression was evaluated. A patched server returns the header value unchanged.</p>
+<p><a href="/a">Related</a> <a href="/b">More posts</a> <a href="/c">Subscribe</a></p>
+<h2>Impact</h2>
+<p>Because the expression language can reach the runtime, an attacker can escalate this into remote code execution as the service account.</p>
+</article><footer>Subscribe to our newsletter. All rights reserved.</footer></body></html>

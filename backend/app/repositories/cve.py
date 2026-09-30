@@ -1,12 +1,12 @@
 from collections.abc import Iterable
 from datetime import UTC, datetime
-from urllib.parse import urlsplit
 
 from sqlalchemy import ColumnElement, String, and_, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import CVE, CVEReference, DataOrigin, ReliabilityLevel, Source, SourceType
+from app.models import CVE, CVEReference, DataOrigin, ReliabilityLevel, Source
+from app.research.classify import classify_url
 from app.schemas.cve import (
     CWE,
     AffectedProduct,
@@ -140,7 +140,7 @@ class CVERepository:
                 (
                     None,
                     {
-                        "source_type": _infer_source_type(ref.url, ref.tags),
+                        "source_type": classify_url(ref.url, ref.tags)[0],
                         "title": (ref.title or ref.url)[:500],
                         "publisher": None,
                         "retrieved_at": None,  # linked, never fetched
@@ -190,26 +190,6 @@ def _is_improvement(row: CVE, record: CVERecord) -> bool:
         row.retrieved_at if row.retrieved_at.tzinfo else row.retrieved_at.replace(tzinfo=UTC)
     )
     return record.retrieved_at > stored_at
-
-
-def _infer_source_type(url: str, tags: list[str]) -> SourceType:
-    parts = urlsplit(url)
-    host = (parts.hostname or "").lower()
-    if host == "nvd.nist.gov":
-        return SourceType.NVD
-    if host in {"cve.org", "www.cve.org", "cve.mitre.org", "cveawg.mitre.org"}:
-        return SourceType.MITRE
-    if host == "cisa.gov" or host.endswith(".cisa.gov"):
-        return SourceType.CISA
-    if host == "cert.org" or host.endswith(".cert.org"):
-        return SourceType.CERT
-    if host == "exploit-db.com" or host.endswith(".exploit-db.com"):
-        return SourceType.EXPLOIT_DB
-    if host == "github.com" and "/advisories" in parts.path or "/security/advisories" in parts.path:
-        return SourceType.GITHUB_ADVISORY
-    if any(tag.lower().replace("-", " ") == "vendor advisory" for tag in tags):
-        return SourceType.VENDOR_ADVISORY
-    return SourceType.OTHER
 
 
 def record_from_row(row: CVE) -> CVERecord:

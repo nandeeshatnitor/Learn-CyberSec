@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from app.models import ReliabilityLevel, SourceType
+from app.models import ReliabilityLevel, SourceStatus, SourceType
 from app.schemas.common import HttpUrlStr, ORMModel
 
 
@@ -14,3 +14,5 @@ class SourceRead(ORMModel):
     # None means the platform links to this source but has not retrieved its content.
     retrieved_at: datetime | None
     reliability_level: ReliabilityLevel
+    status: SourceStatus
+    content_hash: str | None
