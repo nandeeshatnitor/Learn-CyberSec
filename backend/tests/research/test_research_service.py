@@ -370,3 +370,44 @@ def test_outdated_stored_guide_is_reported_not_crashed_on(
     db.commit()
     with pytest.raises(NotFoundError):
         service.guide(CVE_ID)
+
+
+def test_a_run_can_only_be_claimed_once(repo: ResearchRepository) -> None:
+    run = repo.create(CVE_ID, "1")
+    assert run is not None
+    assert repo.claim(run.id) is not None
+    assert repo.claim(run.id) is None  # a second worker with the same job gets nothing
+    assert repo.claim(uuid.uuid4()) is None
+
+
+def test_redelivered_job_does_not_run_the_pipeline_twice(
+    repo: ResearchRepository, make_runner: Callable[..., ResearchRunner], web
+) -> None:
+    from app.research.discovery.references import ReferenceDiscoverer
+    from tests.research.support import make_fetcher
+
+    calls = 0
+
+    class Counting(ResearchPipeline):
+        def gather(self, record, progress=None):  # type: ignore[no-untyped-def]
+            nonlocal calls
+            calls += 1
+            return super().gather(record, progress)
+
+    run = repo.create(CVE_ID, "1")
+    assert run is not None
+    runner = make_runner(pipeline=Counting([ReferenceDiscoverer()], make_fetcher(web)))
+    runner.execute(run.id)
+    runner.execute(run.id)
+    assert calls == 1
+
+
+def test_unknown_cves_do_not_spend_the_budget(
+    make_service: Callable[..., ResearchService], repo: ResearchRepository
+) -> None:
+    limiter = InMemorySlidingWindowLimiter()
+    service = make_service(policy=ResearchPolicy(daily_run_budget=1), limiter=limiter)
+    for _ in range(5):
+        with pytest.raises(NotFoundError):
+            service.request("CVE-2099-00001", client_key="probe")
+    service.request(CVE_ID, client_key="someone-else")  # the daily allowance is untouched

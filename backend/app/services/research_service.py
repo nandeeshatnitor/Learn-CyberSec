@@ -132,8 +132,10 @@ class ResearchService:
         ):
             return self._status_of(ready, cve_id, cached=True), False
 
+        # An unknown CVE is refused before any budget is spent, so probing made-up IDs cannot
+        # use up the shared daily allowance.
+        self._cves.get_cve(cve_id)
         self._spend_budget(client_key)
-        self._cves.get_cve(cve_id)  # 404 for an unknown CVE, before any work is queued
         run = self._repo.create(cve_id, self._policy.generation_version)
         if run is None:  # lost a race with a concurrent request
             existing = self._repo.active(cve_id)
@@ -310,9 +312,9 @@ class ResearchRunner:
         self._version = generation_version
 
     def execute(self, run_id: uuid.UUID) -> None:
-        run = self._repo.get(run_id)
-        if run is None or run.status is not ResearchStatus.QUEUED:
-            return  # unknown, or already picked up (a retried job must not run twice)
+        run = self._repo.claim(run_id)
+        if run is None:
+            return  # unknown, or already picked up (a redelivered job must not run twice)
         try:
             self._run(run)
         except DomainError as exc:
@@ -324,7 +326,6 @@ class ResearchRunner:
             self._repo.fail(run, "internal_error", "Research failed unexpectedly.")
 
     def _run(self, run: ResearchRun) -> None:
-        self._repo.progress(run, ResearchStatus.RESEARCHING, "Looking up the CVE record")
         response = self._cves.get_cve(run.cve_id)
         record = CVERecord.model_validate(response.model_dump(exclude={"meta"}))
 

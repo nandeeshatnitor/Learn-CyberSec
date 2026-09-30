@@ -53,8 +53,9 @@ export function GenerateGuidePanel({ cveId }: { cveId: string }) {
 
   const showGuide = useCallback(
     async (previous?: ResearchGuideResponse): Promise<void> => {
-      const result = await fetchGuide(cveId, signal());
-      if (!alive.current) return;
+      const sig = signal();
+      const result = await fetchGuide(cveId, sig);
+      if (!alive.current || sig.aborted) return; // superseded by a newer request or unmounted
       if (result.ok) setView({ phase: "ready", response: result.data });
       else if (previous) setView({ phase: "ready", response: previous, notice: result.problem.message });
       else setView({ phase: "problem", problem: result.problem });
@@ -71,8 +72,9 @@ export function GenerateGuidePanel({ cveId }: { cveId: string }) {
 
       const tick = async (): Promise<void> => {
         if (!alive.current) return;
-        const result: Outcome<ResearchStatus> = await fetchStatus(cveId, signal());
-        if (!alive.current) return;
+        const sig = signal();
+        const result: Outcome<ResearchStatus> = await fetchStatus(cveId, sig);
+        if (!alive.current || sig.aborted) return;
         if (!result.ok) {
           errors += 1;
           if (errors >= MAX_CONSECUTIVE_ERRORS || result.problem.kind === "rate_limited") {
@@ -109,8 +111,9 @@ export function GenerateGuidePanel({ cveId }: { cveId: string }) {
   useEffect(() => {
     alive.current = true;
     void (async () => {
-      const result = await fetchStatus(cveId, signal());
-      if (!alive.current) return;
+      const sig = signal();
+      const result = await fetchStatus(cveId, sig);
+      if (!alive.current || sig.aborted) return;
       if (!result.ok) {
         // A missing research feature must not break the CVE page: offer the button anyway.
         setView({ phase: "problem", problem: result.problem });
@@ -138,8 +141,9 @@ export function GenerateGuidePanel({ cveId }: { cveId: string }) {
     const previous = view.phase === "ready" ? view.response : undefined;
     setBusy(true);
     stopPolling();
-    const result = await startResearch(cveId, refresh, signal());
-    if (!alive.current) return;
+    const sig = signal();
+    const result = await startResearch(cveId, refresh, sig);
+    if (!alive.current || sig.aborted) return;
     setBusy(false);
     if (!result.ok) {
       if (previous) setView({ phase: "ready", response: previous, notice: result.problem.message });

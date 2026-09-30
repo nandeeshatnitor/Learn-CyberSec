@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GenerateGuidePanel } from "@/components/research/generate-guide-panel";
@@ -16,6 +17,9 @@ function scriptFetch(script: {
   const queues = { status: [...(script.status ?? [])], start: [...(script.start ?? [])], guide: [...(script.guide ?? [])] };
   const calls: { key: string; method: string; body?: string }[] = [];
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    await Promise.resolve();
+    // Like a real fetch: a request whose signal was aborted rejects.
+    if (init?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const url = String(input);
     const method = init?.method ?? "GET";
     const key = url.endsWith("/status") ? "status" : method === "POST" ? "start" : "guide";
@@ -263,5 +267,24 @@ describe("generate learning guide panel", () => {
     render(<GenerateGuidePanel cveId={CVE} />);
     await settle();
     expect(screen.getByTestId("research-error")).toHaveTextContent(/unexpected response/);
+  });
+
+  it("does not flash an error when React mounts the panel twice (strict mode)", async () => {
+    scriptFetch({ status: [{ body: makeStatus("not_started") }] });
+    let flashed = false;
+    const observer = new MutationObserver(() => {
+      if (document.querySelector("[data-testid=research-error]")) flashed = true;
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    render(
+      <StrictMode>
+        <GenerateGuidePanel cveId={CVE} />
+      </StrictMode>,
+    );
+    await settle();
+    observer.disconnect();
+    expect(flashed).toBe(false);
+    expect(screen.queryByTestId("research-error")).toBeNull();
+    expect(screen.getByRole("button", { name: "Generate Learning Guide" })).toBeInTheDocument();
   });
 });

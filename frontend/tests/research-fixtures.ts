@@ -57,7 +57,7 @@ export function makeGuide(overrides: Partial<LearningGuide> = {}): LearningGuide
     prerequisites: [claim("The preview feature must be enabled.", { evidence_level: "SYNTHESIZED" })],
     reproduction: {
       status: "established",
-      statement: "Established from a single public source (S4); nothing confirms it independently.",
+      statement: "Based on a single public source (S4); nothing confirms it independently.",
       environment: [claim("Use the intentionally vulnerable Docker image.", { source_ids: ["S4"], passage_ids: [] })],
       steps: [
         {

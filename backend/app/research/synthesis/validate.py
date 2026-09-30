@@ -407,16 +407,14 @@ def _reproduction(
     if status == "established":
         if len(used) == 1:
             statement = (
-                f"Established from a single public source ({used[0]}); "
-                "nothing confirms it independently."
+                f"Based on a single public source ({used[0]}); nothing confirms it independently."
             )
         elif len(groups) == 1:
             statement = (
-                f"Established from {len(used)} public sources that are not independent "
-                "of one another."
+                f"Based on {len(used)} public sources that are not independent of one another."
             )
         else:
-            statement = f"Established from {len(used)} independent public sources."
+            statement = f"Based on {len(used)} independent public sources."
     else:
         statement = (
             "Only partially established from public sources: "

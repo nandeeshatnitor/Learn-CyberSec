@@ -74,6 +74,26 @@ class ResearchRepository:
         self._session.commit()
         return int(getattr(result, "rowcount", 0) or 0)
 
+    def claim(self, run_id: uuid.UUID) -> ResearchRun | None:
+        """Atomically move a QUEUED run to RESEARCHING. Only the caller that wins gets the run, so
+        a job delivered twice (queue retry, two workers) cannot execute twice."""
+        result = self._session.execute(
+            update(ResearchRun)
+            .where(ResearchRun.id == run_id, ResearchRun.status == ResearchStatus.QUEUED)
+            .values(
+                status=ResearchStatus.RESEARCHING,
+                stage_detail="Looking up the CVE record",
+                started_at=self._clock(),
+            )
+        )
+        self._session.commit()
+        if not getattr(result, "rowcount", 0):
+            return None
+        run = self._session.get(ResearchRun, run_id)
+        if run is not None:
+            self._session.refresh(run)
+        return run
+
     def progress(self, run: ResearchRun, status: ResearchStatus, detail: str | None = None) -> None:
         run.status = status
         run.stage_detail = detail[:200] if detail else None
