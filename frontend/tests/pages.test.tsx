@@ -18,6 +18,7 @@ import SearchPage from "@/app/cves/page";
 import { getCve, searchCves } from "@/lib/api";
 
 const getCveMock = vi.mocked(getCve);
+const fetchMock = vi.fn();
 const searchMock = vi.mocked(searchCves);
 
 async function renderSearch(params: Record<string, string | string[] | undefined>) {
@@ -30,6 +31,14 @@ async function renderCve(cveId: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The learning-guide panel asks this site's own API for its status when it mounts.
+  fetchMock.mockResolvedValue({
+    ok: true,
+    status: 200,
+    headers: new Headers(),
+    json: async () => ({ cve_id: "CVE-2021-44228", status: "not_started", stage: "No learning guide has been generated yet" }),
+  });
+  vi.stubGlobal("fetch", fetchMock);
 });
 
 describe("search page", () => {
@@ -142,9 +151,15 @@ describe("CVE page", () => {
   it("keeps the later-phase sections clearly unavailable", async () => {
     getCveMock.mockResolvedValue({ ok: true, data: makeDetail() });
     await renderCve("CVE-2021-44228");
-    for (const title of ["Learning Guide", "Reproduction", "Hints", "Remediation"]) {
-      expect(screen.getByRole("heading", { name: title }).closest("section")).toHaveAttribute("data-availability", "unavailable");
-    }
+    expect(screen.getByRole("heading", { name: "Hints" }).closest("section")).toHaveAttribute("data-availability", "unavailable");
+  });
+
+  it("offers to generate a learning guide instead of a placeholder", async () => {
+    getCveMock.mockResolvedValue({ ok: true, data: makeDetail() });
+    await renderCve("CVE-2021-44228");
+    expect(screen.getByRole("heading", { name: "Learning guide" }).closest("section")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Generate Learning Guide" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/cves/CVE-2021-44228/research/status", expect.anything());
   });
 
   it("normalises the ID from the URL", async () => {

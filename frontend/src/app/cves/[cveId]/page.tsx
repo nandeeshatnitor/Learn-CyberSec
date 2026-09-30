@@ -9,6 +9,7 @@ import { KevSection } from "@/components/cve/kev-section";
 import { ProviderStatusBanner } from "@/components/cve/provider-status-banner";
 import { ReferencesSection } from "@/components/cve/references-section";
 import { SourcesSection } from "@/components/cve/sources-section";
+import { GenerateGuidePanel } from "@/components/research/generate-guide-panel";
 import { WeaknessSection } from "@/components/cve/weakness-section";
 import { DataOriginBanner } from "@/components/data-origin-banner";
 import { SectionCard, UnavailableNotice } from "@/components/section-card";
@@ -69,26 +70,10 @@ export default async function CvePage({ params }: Params) {
       <ReferencesSection cve={cve} />
       <SourcesSection cve={cve} />
 
-      <SectionCard id="learning-guide" title="Learning Guide" unavailable>
-        <UnavailableNotice>
-          Not available yet. A structured walkthrough (what it is, why it happens, how it works) is
-          planned for a later phase.
-        </UnavailableNotice>
-      </SectionCard>
-      <SectionCard id="reproduction" title="Reproduction" unavailable>
-        <UnavailableNotice>
-          Not available yet. Reproduction guidance for an authorised local lab will come with the
-          sandbox phase. Nothing is executed automatically.
-        </UnavailableNotice>
-      </SectionCard>
+      {/* Generated on demand from public sources; see components/research. */}
+      <GenerateGuidePanel cveId={cve.cve_id} />
       <SectionCard id="hints" title="Hints" unavailable>
         <UnavailableNotice>Not available yet. Interactive hints are planned for a later phase.</UnavailableNotice>
-      </SectionCard>
-      <SectionCard id="remediation" title="Remediation" unavailable>
-        <UnavailableNotice>
-          Not available as a guide yet. Vendor advisories, where the sources list them, appear under
-          References above.
-        </UnavailableNotice>
       </SectionCard>
     </article>
   );
