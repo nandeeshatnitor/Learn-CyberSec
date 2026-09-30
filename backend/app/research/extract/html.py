@@ -6,6 +6,7 @@ are removed; text hidden from human readers is set aside for injection screening
 
 import re
 from collections.abc import Iterator
+from html.parser import HTMLParser
 
 from bs4 import BeautifulSoup
 from bs4.element import Comment, NavigableString, Tag
@@ -55,6 +56,49 @@ _BLOCK_TAGS = frozenset(
 _HEADINGS = {f"h{i}": i for i in range(1, 7)}
 MAX_DEPTH = 120
 MAX_HIDDEN_CHARS = 8000
+# Tree operations on hostile markup can be quadratic (every ancestor check walks the tree), so the
+# shape of a page is bounded *before* a tree is built. Real articles nest well under 100 levels.
+MAX_NESTING = 256
+MAX_TAGS = 40_000
+_VOID = frozenset(
+    {
+        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source",
+        "track", "wbr",
+    }
+)  # fmt: skip
+
+
+class _ShapeScanner(HTMLParser):
+    """A linear pass that measures nesting depth and tag count, and builds nothing."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.depth = 0
+        self.tags = 0
+
+    def _too_big(self) -> bool:
+        return self.depth > MAX_NESTING or self.tags > MAX_TAGS
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.tags += 1
+        if tag not in _VOID:
+            self.depth += 1
+        if self._too_big():
+            raise ValueError("page structure too large")
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.tags += 1
+        if self.tags > MAX_TAGS:
+            raise ValueError("page structure too large")
+
+    def handle_endtag(self, tag: str) -> None:
+        self.depth = max(0, self.depth - 1)
+
+
+def check_page_shape(text: str) -> None:
+    scanner = _ShapeScanner()
+    scanner.feed(text)
+    scanner.close()
 
 
 def _is_hidden(tag: Tag) -> bool:
@@ -85,7 +129,7 @@ def _strip_page_furniture(soup: BeautifulSoup, stats: dict[str, int]) -> list[st
         hidden.append(str(comment))
         comment.extract()
     for tag in list(soup.find_all(True)):
-        if tag.decomposed:
+        if tag.__dict__.get("_decomposed"):  # O(1); `tag.decomposed` searches the whole subtree
             continue
         if tag.name in _DROP_TAGS:
             if tag.name in _HIDDEN_ONLY_TAGS:
@@ -194,6 +238,7 @@ def _iter_hidden(parts: list[str]) -> Iterator[str]:
 
 
 def extract_html(body: bytes, charset: str | None = None) -> ExtractedDocument:
+    check_page_shape(body.decode(charset or "utf-8", errors="replace"))
     soup = BeautifulSoup(body, "html.parser", from_encoding=charset)
     # The <title> lives in <head>, which is dropped as furniture below: read it first.
     title_tag = soup.find("title")

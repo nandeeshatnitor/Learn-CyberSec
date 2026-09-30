@@ -18,7 +18,7 @@ def build_guide(
     pack: EvidencePack,
     *,
     llm: StructuredLLM | None,
-    generation_version: int,
+    generation_version: str,
 ) -> LearningGuide:
     extractive = ExtractiveSynthesizer()
     reason: str | None = "llm_not_configured"

@@ -15,6 +15,8 @@ from app.services import (
     NotFoundError,
     ProvidersUnavailableError,
     RateLimitedError,
+    ResearchDisabledError,
+    ResearchUnavailableError,
 )
 from app.utils.logging import get_logger
 
@@ -25,6 +27,8 @@ _DOMAIN_STATUS = {
     InvalidInputError: 422,
     ProvidersUnavailableError: 503,
     RateLimitedError: 429,
+    ResearchDisabledError: 503,
+    ResearchUnavailableError: 503,
 }
 
 

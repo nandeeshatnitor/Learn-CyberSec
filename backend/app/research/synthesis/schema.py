@@ -141,7 +141,7 @@ class ValidationSummary(_Model):
 
 
 class GuideGeneration(_Model):
-    generation_version: int
+    generation_version: str
     synthesis_method: Literal["llm", "extractive"]
     model_version: str | None = None
     generated_at: datetime

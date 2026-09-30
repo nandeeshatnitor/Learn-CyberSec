@@ -48,7 +48,9 @@ def find_duplicate_documents(docs: Sequence[DocumentFingerprint]) -> dict[int, i
     Mirrors, syndicated copies and re-posts are near-identical, so counting them as separate sources
     would fake independent corroboration. The better (heavier, then longer) copy survives.
     """
-    order = sorted(range(len(docs)), key=lambda i: (-docs[i].weight, -len(docs[i].text), i))
+    order = sorted(
+        range(len(docs)), key=lambda i: (-docs[i].weight, -len(normalise(docs[i].text)), i)
+    )
     kept: list[int] = []
     hashes: dict[str, int] = {}
     sets: dict[int, frozenset[str]] = {}

@@ -618,7 +618,7 @@ def validate_and_ground(
     draft: GuideDraft,
     pack: EvidencePack,
     *,
-    generation_version: int,
+    generation_version: str,
     synthesis_method: str,
     model_version: str | None = None,
     fallback_reason: str | None = None,

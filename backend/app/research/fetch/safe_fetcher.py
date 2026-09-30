@@ -245,7 +245,7 @@ class PublicWebFetcher:
             # Unreachable or a server error: assume the site does not want to be crawled.
             return _Robots(expires=self._clock() + 300, disallow_all=True)
         except FetchBlocked:
-            return _Robots(expires=self._clock() + 300, disallow_all=True)
+            raise  # the destination itself is forbidden: report that, not "robots unavailable"
 
     def _robots_delay(self, target: Target) -> float | None:
         return self._robots_for(target).delay if self._respect_robots else None

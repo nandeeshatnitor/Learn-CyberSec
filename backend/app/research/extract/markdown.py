@@ -8,6 +8,7 @@ from app.research.extract.blocks import clean_code, clean_paragraph, finalize
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _TAG = re.compile(r"</?[A-Za-z][^>]{0,300}>")
 _IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+_EMPTY_LINK = re.compile(r"\[\s*\]\([^)]*\)")  # what is left of a linked badge
 _LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _REF_LINK_DEF = re.compile(r"^\s*\[[^\]]+\]:\s+\S+.*$")
 _FENCE = re.compile(r"^\s{0,3}(```|~~~)")
@@ -18,6 +19,7 @@ _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 
 def _inline(text: str) -> str:
     text = _IMAGE.sub("", text)
+    text = _EMPTY_LINK.sub("", text)
     text = _LINK.sub(r"\1", text)
     text = _TAG.sub(" ", text)
     return text.replace("**", "").replace("__", "")

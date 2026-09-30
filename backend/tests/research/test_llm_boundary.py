@@ -115,7 +115,7 @@ def obedient_draft(pack: EvidencePack) -> GuideDraft:
 
 def test_obedient_model_output_is_stripped_of_injected_content(pack: EvidencePack) -> None:
     guide = validate_and_ground(
-        obedient_draft(pack), pack, generation_version=1, synthesis_method="llm"
+        obedient_draft(pack), pack, generation_version="1", synthesis_method="llm"
     )
     text = guide.model_dump_json()
     for forbidden in (HOSTILE, "198.51.100.9", "not real", "system prompt", "security tooling"):
@@ -129,7 +129,7 @@ def test_output_that_validates_to_almost_nothing_falls_back_to_extractive(
     pack: EvidencePack,
 ) -> None:
     llm = FakeLLM(obedient_draft(pack))
-    guide = build_guide(pack, llm=llm, generation_version=1)
+    guide = build_guide(pack, llm=llm, generation_version="1")
     assert guide.generation.synthesis_method == "extractive"
     assert guide.generation.fallback_reason == "llm_output_unsupported"
     assert guide.summary  # the deterministic guide still teaches something
@@ -147,10 +147,10 @@ def test_good_model_output_is_published_as_llm(pack: EvidencePack) -> None:
         remediation=[claim("Upgrade to AcmeDocs 4.2.4 or later.", up)],
     )
     llm = FakeLLM(draft)
-    guide = build_guide(pack, llm=llm, generation_version=3)
+    guide = build_guide(pack, llm=llm, generation_version="3")
     assert guide.generation.synthesis_method == "llm"
     assert guide.generation.model_version == "fake-model-1"
-    assert guide.generation.generation_version == 3
+    assert guide.generation.generation_version == "3"
     assert guide.generation.fallback_reason is None
     assert len(llm.calls) == 1
 
@@ -167,13 +167,13 @@ def test_good_model_output_is_published_as_llm(pack: EvidencePack) -> None:
 def test_model_failures_fall_back_and_record_why(
     pack: EvidencePack, error: Exception, code: str
 ) -> None:
-    guide = build_guide(pack, llm=FakeLLM(error), generation_version=1)  # type: ignore[arg-type]
+    guide = build_guide(pack, llm=FakeLLM(error), generation_version="1")  # type: ignore[arg-type]
     assert guide.generation.synthesis_method == "extractive"
     assert guide.generation.fallback_reason == code
 
 
 def test_no_llm_configured_is_reported_not_hidden(pack: EvidencePack) -> None:
-    guide = build_guide(pack, llm=None, generation_version=1)
+    guide = build_guide(pack, llm=None, generation_version="1")
     assert guide.generation.fallback_reason == "llm_not_configured"
     assert guide.generation.model_version is None
 

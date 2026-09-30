@@ -12,10 +12,11 @@ from app.config import Settings, get_settings
 from app.database import get_db
 from app.database.redis import get_redis
 from app.integrations.registry import ProviderRegistry, build_registry
-from app.repositories import CVERepository, SourceRepository
-from app.services import CVEService, HealthService, SourceService
+from app.repositories import CVERepository, ResearchRepository, SourceRepository
+from app.services import CVEService, HealthService, ResearchPolicy, ResearchService, SourceService
 from app.services.errors import RateLimitedError
 from app.utils.client_ip import client_ip, parse_networks
+from app.workers.queue import JobQueue, build_job_queue
 
 DbSession = Annotated[Session, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
@@ -46,13 +47,21 @@ def shutdown_infrastructure() -> None:
 InfraDep = Annotated[Infrastructure, Depends(get_infrastructure)]
 
 
-def enforce_rate_limit(request: Request, infra: InfraDep, settings: AppSettings) -> None:
-    """Per-client-IP limit on endpoints that can trigger upstream provider requests."""
-    client = client_ip(
+def get_client_key(request: Request, settings: AppSettings) -> str:
+    """The caller's address for rate limiting (X-Forwarded-For is trusted only from configured
+    proxies, see `client_ip`)."""
+    return client_ip(
         request.client.host if request.client else None,
         request.headers.get("x-forwarded-for"),
         parse_networks(tuple(settings.trusted_proxies)),
     )
+
+
+ClientKey = Annotated[str, Depends(get_client_key)]
+
+
+def enforce_rate_limit(client: ClientKey, infra: InfraDep, settings: AppSettings) -> None:
+    """Per-client-IP limit on endpoints that can trigger upstream provider requests."""
     decision = infra.limiter.acquire(
         f"api:{client}", settings.api_rate_limit_requests, settings.api_rate_limit_window_seconds
     )
@@ -60,8 +69,38 @@ def enforce_rate_limit(request: Request, infra: InfraDep, settings: AppSettings)
         raise RateLimitedError("Too many requests. Please slow down.", decision.retry_after)
 
 
+def enforce_research_read_limit(client: ClientKey, infra: InfraDep, settings: AppSettings) -> None:
+    """Research status is polled while a guide is generated and only reads the database, so it has
+    its own, larger budget instead of eating into the provider-facing one."""
+    decision = infra.limiter.acquire(
+        f"research-read:{client}", settings.research_read_rate_limit_requests, 60
+    )
+    if not decision.allowed:
+        raise RateLimitedError("Too many requests. Please slow down.", decision.retry_after)
+
+
 def get_cve_service(db: DbSession, infra: InfraDep, settings: AppSettings) -> CVEService:
     return CVEService(infra.registry, CVERepository(db), max_page_size=settings.max_page_size)
+
+
+@lru_cache
+def get_job_queue() -> JobQueue:
+    return build_job_queue(get_settings())
+
+
+def get_research_service(
+    db: DbSession,
+    infra: InfraDep,
+    settings: AppSettings,
+    queue: Annotated[JobQueue, Depends(get_job_queue)],
+) -> ResearchService:
+    return ResearchService(
+        ResearchRepository(db),
+        CVEService(infra.registry, CVERepository(db), max_page_size=settings.max_page_size),
+        queue,
+        infra.limiter,
+        ResearchPolicy.from_settings(settings),
+    )
 
 
 def get_source_service(db: DbSession) -> SourceService:
@@ -75,5 +114,6 @@ def get_health_service(db: DbSession, settings: AppSettings) -> HealthService:
 
 
 CVEServiceDep = Annotated[CVEService, Depends(get_cve_service)]
+ResearchServiceDep = Annotated[ResearchService, Depends(get_research_service)]
 SourceServiceDep = Annotated[SourceService, Depends(get_source_service)]
 HealthServiceDep = Annotated[HealthService, Depends(get_health_service)]

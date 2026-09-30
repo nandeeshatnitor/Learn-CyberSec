@@ -83,7 +83,41 @@ class Settings(BaseSettings):
     # CIDRs, comma-separated). Empty: the header is ignored and the TCP peer is the client.
     trusted_proxies: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
-    @field_validator("redis_url", "nvd_api_key", mode="before")
+    # --- Research: public-source retrieval and learning-guide generation (phase 2) --------------
+    research_enabled: bool = True
+    # "auto": use the LLM when ANTHROPIC_API_KEY is set, else quote the sources (extractive).
+    research_synthesis: Literal["auto", "llm", "extractive"] = "auto"
+    # Optional. Backend only; sent to the Anthropic API and nowhere else, never logged or returned.
+    anthropic_api_key: SecretStr | None = None
+    research_model: str = Field(default="claude-opus-5-5", min_length=1, max_length=64)
+    research_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+    research_max_output_tokens: int = Field(default=12000, ge=1000, le=64000)
+    research_llm_timeout_seconds: float = Field(default=180.0, gt=0, le=900)
+    # "auto": RQ workers when Redis is configured, otherwise a thread in the API process.
+    research_job_backend: Literal["auto", "rq", "thread", "inline"] = "auto"
+    research_queue_name: str = Field(default="research", pattern=r"^[a-z0-9_-]{1,40}$")
+    research_job_timeout_seconds: int = Field(default=600, ge=30, le=3600)
+    # Cached guides are reused for this long; "refresh" is refused inside the cooldown.
+    research_guide_ttl_seconds: int = Field(default=7 * 24 * 3600, ge=0)
+    research_refresh_cooldown_seconds: int = Field(default=3600, ge=0)
+    # An active run that has not moved for this long is considered dead and is failed.
+    research_stale_run_seconds: int = Field(default=1800, ge=60)
+    # Abuse and cost limits: new research runs per client IP per hour, and per day in total.
+    research_per_ip_runs_per_hour: int = Field(default=5, ge=1)
+    research_daily_run_budget: int = Field(default=200, ge=1)
+    research_read_rate_limit_requests: int = Field(default=180, ge=1)  # status polls per minute
+    research_max_documents: int = Field(default=12, ge=1, le=30)  # fetched per run
+    research_max_sources_used: int = Field(default=8, ge=1, le=20)
+    research_deadline_seconds: float = Field(default=120.0, gt=0, le=900)
+    research_fetch_connect_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
+    research_fetch_read_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    research_fetch_max_bytes: int = Field(default=1_500_000, ge=10_000, le=10_000_000)
+    research_crawl_delay_seconds: float = Field(default=2.0, ge=0, le=60)
+    research_discover_github: bool = True
+    # Optional. Raises GitHub's API rate limit; only ever sent to api.github.com.
+    github_token: SecretStr | None = None
+
+    @field_validator("redis_url", "nvd_api_key", "anthropic_api_key", "github_token", mode="before")
     @classmethod
     def _empty_secret_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
@@ -118,6 +152,8 @@ class Settings(BaseSettings):
             raise ValueError(f"invalid TRUSTED_PROXIES entry: {exc}") from exc
         if self.allow_insecure_provider_urls and self.environment == "production":
             raise ValueError("ALLOW_INSECURE_PROVIDER_URLS must not be enabled in production")
+        if self.research_synthesis == "llm" and self.anthropic_api_key is None:
+            raise ValueError("RESEARCH_SYNTHESIS=llm requires ANTHROPIC_API_KEY")
         return self
 
     @property
@@ -132,6 +168,12 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    @property
+    def llm_enabled(self) -> bool:
+        if self.research_synthesis == "extractive":
+            return False
+        return self.anthropic_api_key is not None
 
     @property
     def is_production(self) -> bool:

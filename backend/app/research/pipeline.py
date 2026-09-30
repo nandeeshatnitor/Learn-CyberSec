@@ -353,8 +353,9 @@ class ResearchPipeline:
         seen_passages: set[str] = {text_hash(p.text) for s in pack_sources for p in s.passages}
         total = 0
         number = len(pack_sources) + 1
+        documents_cited = 0
         for doc in used:
-            if number - len(pack_sources) > self._config.max_sources_used:
+            if documents_cited >= self._config.max_sources_used:
                 doc.status, doc.detail = SourceStatus.SKIPPED, "over_source_limit"
                 doc.passages = []
                 continue
@@ -374,6 +375,7 @@ class ResearchPipeline:
                 continue
             sid = f"S{number}"
             number += 1
+            documents_cited += 1
             doc.sid = sid
             doc.passages = [
                 p.model_copy(update={"id": f"{sid}-P{i:02d}", "source_sid": sid})

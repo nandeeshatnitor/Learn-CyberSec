@@ -20,7 +20,7 @@ def pack() -> EvidencePack:
 
 
 def guide(draft: GuideDraft, pack: EvidencePack, method: str = "llm") -> LearningGuide:
-    return validate_and_ground(draft, pack, generation_version=1, synthesis_method=method)
+    return validate_and_ground(draft, pack, generation_version="1", synthesis_method=method)
 
 
 def test_stated_claim_with_valid_citation_is_documented(pack: EvidencePack) -> None:
