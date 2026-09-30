@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -286,5 +286,21 @@ describe("generate learning guide panel", () => {
     expect(flashed).toBe(false);
     expect(screen.queryByTestId("research-error")).toBeNull();
     expect(screen.getByRole("button", { name: "Generate Learning Guide" })).toBeInTheDocument();
+  });
+
+  it("invites the reader to learn step by step and tucks the full guide away as a spoiler", async () => {
+    scriptFetch({
+      status: [{ body: makeStatus("ready") }],
+      guide: [{ body: makeGuideResponse() }],
+    });
+    render(<GenerateGuidePanel cveId={CVE} />);
+    await settle();
+    const callout = screen.getByTestId("learn-callout");
+    expect(callout).toHaveTextContent(/Instead of reading the solution, work through it/);
+    expect(within(callout).getByRole("link", { name: "Start learning session" })).toHaveAttribute("href", `/learn/${CVE}`);
+    const reference = screen.getByTestId("reference-guide") as HTMLDetailsElement;
+    expect(reference.open).toBe(false);
+    expect(reference).toHaveTextContent(/spoiler: contains the full solution/);
+    expect(reference).toContainElement(screen.getByTestId("guide-view"));
   });
 });

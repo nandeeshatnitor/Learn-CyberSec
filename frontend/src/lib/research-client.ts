@@ -43,7 +43,12 @@ function problemFrom(status: number, body: unknown, retryAfter: string | null): 
   const message = typeof error.message === "string" ? error.message : "";
   if (status === 404) return { kind: "not_found", message: message || "Not found." };
   if (status === 403) return { kind: "forbidden", message: "This request was refused." };
-  if (status === 422) return { kind: "invalid", message: "The request was rejected as invalid." };
+  if (status === 422) {
+    // "invalid_input" messages are written for the user; framework validation errors are not.
+    const friendly = code === "invalid_input" && message ? message : "The request was rejected as invalid.";
+    return { kind: "invalid", message: friendly };
+  }
+  if (status === 409 && message) return { kind: "invalid", message };
   if (status === 429) {
     const seconds = Number(retryAfter);
     return {
@@ -56,7 +61,7 @@ function problemFrom(status: number, body: unknown, retryAfter: string | null): 
   return { kind: "unavailable", message: message || "The service is not available right now." };
 }
 
-async function call<T>(
+export async function call<T>(
   url: string,
   isValid: (value: unknown) => value is T,
   init: RequestInit = {},

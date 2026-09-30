@@ -56,6 +56,16 @@ per CVE**.
 `robots_disallowed`), `independent_group`, `relevance`, and `passages` (the short excerpts kept:
 never whole pages).
 
+**Learning (migration `0004`)**: `learning_sessions` (`user_id` = hash of an anonymous learner token,
+`cve_id`, `status` not_started/in_progress/completed/abandoned, `started_at`, `completed_at`,
+`hints_used`, `solution_revealed`, `score`, `guide_run_id` (provenance, no FK), `generation_version`,
+`scoring` (rules copied at start), `snapshot` (the guide with its private challenge, the CVE summary and
+the evidence sources)); `learning_task_progress` (per task: `status` open/correct/revealed, `attempts`,
+`hints_revealed`, `best_result`); `learning_hint_events` (`hint_number` 1-3, or 4 for the solution,
+`penalty`, `content`, `source_ids`, `passage_ids`, timestamp); `learning_attempts` (answer, result,
+feedback); `tutor_messages` (`position`, `role`, `content`, structured `payload` with citations,
+`outcome`). Child tables cascade with the session.
+
 ## Placeholders (documented only; no tables yet)
 
 | Entity | Intended purpose | Phase |
@@ -63,8 +73,7 @@ never whole pages).
 | `User` | Accounts and roles | with progress tracking |
 | `SearchQuery` | Search history / popularity | later |
 | `LearningGuide` | *Implemented* as the validated JSON in `research_runs.guide` (schema: `app/research/synthesis/schema.py`); a dedicated table is only needed if guides must be queried by field | phase 2 |
-| `Hint` | Progressive hints per guide/lab step | hints |
-| `UserProgress` | Per-user completion state | hints/labs |
+| `UserProgress` | Cross-device, per-account progress (sessions exist; identity is anonymous today) | accounts |
 | `LabDefinition` | Declarative sandbox environments | sandbox |
 | `LabAttempt` | A user's run of a lab | sandbox |
 

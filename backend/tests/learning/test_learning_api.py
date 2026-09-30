@@ -252,3 +252,14 @@ def test_the_learner_token_is_never_stored_or_echoed(
     assert ALICE not in response.text
     rows = db.execute(text("select user_id from learning_sessions")).scalars().all()
     assert rows and all(ALICE not in r and len(r) == 48 for r in rows)
+
+
+def test_a_finished_tasks_solution_can_be_read_again_but_not_before(api: TestClient) -> None:
+    sid = started(api)
+    early = api.get(f"/api/learning/{sid}/tasks/t1/solution", headers=h())
+    assert early.status_code == 409
+    api.post(f"/api/learning/{sid}/tasks/t1/answer", json={"answer": ANSWERS["t1"]}, headers=h())
+    again = api.get(f"/api/learning/{sid}/tasks/t1/solution", headers=h())
+    assert again.status_code == 200 and again.json()["parts"]
+    assert api.get(f"/api/learning/{sid}/tasks/t2/solution", headers=h()).status_code == 409
+    assert api.get(f"/api/learning/{sid}/tasks/t1/solution", headers=h(BOB)).status_code == 404

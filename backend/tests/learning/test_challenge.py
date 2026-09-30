@@ -54,6 +54,28 @@ def test_a_lab_prerequisite_accompanies_the_reproduction_task(challenge) -> None
     assert any("local or authorized lab" in p.text for p in challenge.prerequisites)
 
 
+def test_prerequisites_and_objectives_do_not_give_away_any_answer(challenge) -> None:  # type: ignore[no-untyped-def]
+    task_text = (
+        f"{t.title} {t.prompt} {t.objective} {' '.join(t.verification_criteria)}"
+        for t in challenge.tasks
+    )
+    visible = " ".join(
+        [
+            *challenge.learning_objectives,
+            *(p.text for p in challenge.prerequisites),
+            *challenge.notes,
+            *task_text,
+        ]
+    )
+    for t in challenge.tasks:
+        for kp in t.key_points:
+            if not kp.required or kp.id == "action":  # generic verbs like "upgrade", not findings
+                continue
+            for phrase in kp.phrases:
+                if len(phrase) >= 5:
+                    assert not contains_phrase(visible, phrase), (t.id, phrase)
+
+
 def test_tasks_without_evidence_are_left_out_and_explained(guide: LearningGuide) -> None:
     bare = guide.model_copy(deep=True)
     bare.root_cause = []

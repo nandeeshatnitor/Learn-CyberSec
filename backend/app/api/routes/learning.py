@@ -8,6 +8,7 @@
     POST /api/learning/{id}/hints                   reveal the next hint (-5/-10/-15 by default)
     POST /api/learning/{id}/tasks/{task}/answer     submit a text answer, get feedback
     POST /api/learning/{id}/tasks/{task}/solution   reveal the solution (-30 by default)
+    GET  /api/learning/{id}/tasks/{task}/solution   re-read the solution of a finished task
     POST /api/learning/{id}/tutor                   ask the AI tutor;  GET the conversation
 
 The caller is an anonymous learner identified by the X-Learner-Token header (kept in a cookie by
@@ -35,6 +36,7 @@ from app.schemas.learning import (
     HintsResponse,
     SessionView,
     SolutionResponse,
+    SolutionView,
     TutorHistory,
     TutorReplyView,
     TutorRequest,
@@ -128,6 +130,15 @@ def submit_answer(
     body: AnswerRequest,
 ) -> AnswerResponse:
     return service.submit_answer(learner, session_id, task_id, body.answer)
+
+
+@router.get(
+    "/{session_id}/tasks/{task_id}/solution", response_model=SolutionView, responses=_ERRORS
+)
+def get_solution(
+    service: LearningServiceDep, learner: LearnerId, session_id: SessionId, task_id: TaskId
+) -> SolutionView:
+    return service.solution_of(learner, session_id, task_id)
 
 
 @router.post(

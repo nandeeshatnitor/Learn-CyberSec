@@ -9,12 +9,17 @@ export function proxy(request: NextRequest) {
   try {
     decodeURIComponent(request.nextUrl.pathname);
   } catch {
-    const target = request.nextUrl.pathname.startsWith("/api/")
-      ? "/api/cves/invalid/research/status"
-      : "/cves/invalid";
+    const path = request.nextUrl.pathname;
+    const target = path.startsWith("/api/learning")
+      ? "/api/learning/invalid"
+      : path.startsWith("/api/")
+        ? "/api/cves/invalid/research/status"
+        : path.startsWith("/learn/")
+          ? "/learn/invalid"
+          : "/cves/invalid";
     return NextResponse.rewrite(new URL(target, request.url));
   }
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/cves/:path*", "/api/cves/:path*"] };
+export const config = { matcher: ["/cves/:path*", "/api/cves/:path*", "/api/learning/:path*", "/learn/:path*"] };

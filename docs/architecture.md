@@ -60,6 +60,15 @@ metadata and excerpts, `build_guide` (LLM or extractive synthesis, then `validat
 the guide. The browser polls a same-origin status route; the worker is the only component that fetches
 third-party pages. Details, trust boundary and limits: [research.md](research.md).
 
+## Interactive learning
+
+`POST /api/learning` snapshots a READY guide (with its private challenge and evidence) into a
+`learning_sessions` row. `LearningService` builds every response from the public half of the challenge plus
+what the student has earned; `learning/rubric.py` grades answers, `learning/scoring.py` scores, and
+`learning/tutor.py` answers questions from the snapshotted evidence through the same claim validator the
+guides use. The `/learn/[cveId]` page is a client workspace over same-origin route handlers that add the
+learner cookie. Details: [learning.md](learning.md).
+
 ## Adding services later
 
 `services/` is reserved for standalone deployable units (for example an ingestion worker or a

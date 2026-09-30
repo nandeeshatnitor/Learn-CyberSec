@@ -40,6 +40,20 @@ controls and where they are tested:
 | Browser → backend | Same-origin Next.js route handlers only: cross-site POSTs refused (`Sec-Fetch-Site`/`Origin`), only a sanitised `X-Forwarded-For` forwarded (no cookies or Authorization), a fixed set of statuses and error fields passed through, everything else becomes a generic 503. |
 | Scope of advice | Reproduction is framed and enforced as local / intentionally vulnerable / authorized-lab only; third-party targets are removed or withheld. |
 
+## Phase 3: learning sessions and the AI tutor
+
+Full design in [learning.md](learning.md). Controls and where they are tested:
+
+| Requirement | How it is handled |
+| --- | --- |
+| Answers must not leak early | Accepted answers, hints and solutions are server-side only; the guide endpoint returns the challenge redacted; the session view carries public task text only; hints 1 and 2 are checked in code not to contain an accepted phrase; feedback never echoes the expected answer. Tests assert no private string appears in any pre-reveal response. |
+| Tutor must not invent or spoil | Every claim is re-validated against the session's evidence (invented versions/identifiers/URLs/numbers and uncited claims removed). Evidence that would answer the current task is withheld from the model and matching sentences are removed from replies, including answers embedded in identifiers. Tested with a scripted model that tries to leak, invent and obey hostile text. |
+| Tutor must stay in scope | Questions about attacking/scanning/testing systems the student does not own, or naming non-local hosts, get a fixed refusal; replies never contain non-local hosts; lab questions carry a reminder; the system prompt limits reproduction to local or authorized labs. |
+| Student input is untrusted | Questions and answers are length-capped and sent to the model only as data in a JSON document (no tools); answers are graded by code. |
+| Identity without accounts | Random token in an HttpOnly, SameSite=Lax cookie unreadable by scripts; only its SHA-256 is stored; a session is invisible (404) to any other token; the token is never echoed in a response or page. |
+| Browser → backend | Same-origin route handlers only, fixed path/method allow-list (no traversal), cross-site POSTs refused, request bodies re-serialised and size-capped, only a sanitised `X-Forwarded-For` and the learner token forwarded, fixed error fields, unexpected statuses become a generic 503. |
+| Cost and abuse | Tutor questions limited per session and per client; sessions per client per hour; learning endpoints have their own read budget. |
+
 ## Trust and provenance (integrity of what users are told)
 
 * Data is presented as *retrieved from* a named source, never as verified by this platform.
@@ -67,5 +81,9 @@ controls and where they are tested:
   egress (deny private ranges and cloud metadata endpoints) in production.
 * **Claim validation is lexical** (see [research.md](research.md#what-validation-cannot-do)): it cannot
   prove a paraphrase is faithful. Every claim shows the excerpt it rests on.
+* **Learner identity is an anonymous cookie**, so possession of the token is the only credential: fine for
+  a learning exercise, not for anything sensitive; add real accounts before storing more than progress.
+* Answer checking is keyword/concept matching (see [learning.md](learning.md#answer-checking)); it can
+  misjudge unusual phrasing in both directions.
 * Phase 2 has not been run against the live web or the live Anthropic API in development (no network
   or key); it is tested with mock transports and fake models.

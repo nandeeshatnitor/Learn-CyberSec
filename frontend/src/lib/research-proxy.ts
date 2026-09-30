@@ -13,21 +13,21 @@ import { parseCveIdParam } from "@/lib/cve";
  * Authorization, nothing else), lets only a fixed set of status codes through, and always answers
  * with a small JSON body of a known shape, so upstream error text can never reach a visitor.
  */
-const REQUEST_TIMEOUT_MS = 30_000;
+export const REQUEST_TIMEOUT_MS = 30_000;
 const PASS_THROUGH = new Set([200, 202, 404, 422, 429, 503]);
-const NO_STORE = { "Cache-Control": "no-store" };
+export const NO_STORE = { "Cache-Control": "no-store" };
 
 export type ResearchAction = "start" | "status" | "guide";
 
-function backendUrl(): string {
+export function backendUrl(): string {
   return (process.env.BACKEND_URL ?? "http://localhost:8000").replace(/\/+$/, "");
 }
 
-function problem(status: number, code: string, message: string, extra: HeadersInit = {}) {
+export function problem(status: number, code: string, message: string, extra: HeadersInit = {}) {
   return NextResponse.json({ error: { code, message } }, { status, headers: { ...NO_STORE, ...extra } });
 }
 
-async function forwardedFor(): Promise<Record<string, string>> {
+export async function forwardedFor(): Promise<Record<string, string>> {
   const value = (await headers()).get("x-forwarded-for");
   return value && /^[0-9a-fA-F.:,\s]{1,200}$/.test(value) ? { "X-Forwarded-For": value } : {};
 }

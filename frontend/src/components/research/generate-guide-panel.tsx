@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { GuideView } from "@/components/research/guide-view";
@@ -169,7 +170,15 @@ export function GenerateGuidePanel({ cveId }: { cveId: string }) {
   if (view.phase === "ready") {
     return (
       <div className="space-y-4">
-        <GuideView response={view.response} />
+        <LearnCallout cveId={cveId} />
+        <details className="rounded-lg border p-4" data-testid="reference-guide">
+          <summary className="cursor-pointer select-none font-medium">
+            Reference guide (spoiler: contains the full solution)
+          </summary>
+          <div className="mt-4">
+            <GuideView response={view.response} />
+          </div>
+        </details>
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground" data-testid="regenerate">
           <Button variant="outline" size="sm" onClick={() => void start(true)} disabled={busy}>
             Regenerate guide
@@ -271,5 +280,27 @@ function Progress({ status }: { status: ResearchStatus }) {
         {status.stage_detail ? `: ${status.stage_detail}` : ""}. This usually takes a minute or two.
       </p>
     </div>
+  );
+}
+
+function LearnCallout({ cveId }: { cveId: string }) {
+  return (
+    <section
+      id="learn"
+      aria-labelledby="learn-callout-title"
+      className="rounded-lg border border-primary/40 bg-primary/5 p-5"
+      data-testid="learn-callout"
+    >
+      <h2 id="learn-callout-title" className="text-lg font-semibold">
+        Learn it step by step
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        The guide is ready. Instead of reading the solution, work through it: investigate the sources, try each
+        task, get feedback and hints, and ask the AI tutor. The full reference guide is below if you want it.
+      </p>
+      <Button asChild className="mt-3">
+        <Link href={`/learn/${cveId}`}>Start learning session</Link>
+      </Button>
+    </section>
   );
 }

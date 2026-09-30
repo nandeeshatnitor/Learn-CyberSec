@@ -107,6 +107,12 @@ def test_the_public_view_never_contains_answers_hints_or_solutions(
         assert secret.lower() not in blob.lower() or secret in ("4.2.4",)
     assert "docker run" not in blob and "curl -H" not in blob
     assert "hints" not in view.model_dump()["tasks"][0]
+    # nothing the session shows *about the tasks* names an accepted answer
+    shown = str(
+        [view.learning_objectives, view.prerequisites, view.notes, view.model_dump()["tasks"]]
+    ).lower()
+    for phrase in ("template engine", "renderer", "x-template-hint", "sanitiz", "4.2.4"):
+        assert phrase not in shown, phrase
 
 
 # -- hints -----------------------------------------------------------------------------

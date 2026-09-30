@@ -310,6 +310,17 @@ class LearningService:
             solution=self._solution_view(loaded, task), penalty=penalty, session=self._view(loaded)
         )
 
+    def solution_of(self, user_id: str, session_id: uuid.UUID, task_id: str) -> SolutionView:
+        """The solution of a task the student has already finished (answered or revealed)."""
+        loaded = self._load(self._owned(user_id, session_id))
+        task = loaded.challenge.task(task_id)
+        progress = loaded.progress.get(task_id)
+        if task is None or progress is None:
+            raise NotFoundError("Unknown task.")
+        if progress.status not in ("correct", "revealed"):
+            raise ConflictError("Finish this task first: the solution is not available yet.")
+        return self._solution_view(loaded, task)
+
     # -- answers ----------------------------------------------------------------------------------
     def submit_answer(
         self, user_id: str, session_id: uuid.UUID, task_id: str, answer: str

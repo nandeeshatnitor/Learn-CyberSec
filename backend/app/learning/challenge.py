@@ -35,6 +35,10 @@ from app.research.synthesis.grounding import specifics
 from app.research.synthesis.schema import Claim, LearningGuide
 from app.schemas.cve import CVERecord
 
+STUDY_PREREQUISITES = (
+    "Comfort reading a CVE record or vendor advisory: affected versions, causes and fixes.",
+    "Basic familiarity with how software receives input, for example an HTTP request.",
+)
 LAB_PREREQUISITE = (
     "A local or authorized lab environment that you control. Never test a system you do not own "
     "or have explicit permission to test."
@@ -650,9 +654,9 @@ def build_challenge(guide: LearningGuide, cve: CVERecord) -> Challenge:
         task.id = f"t{task.order}"
         task.hints = _hints(ctx, task)
         tasks.append(task)
-    prerequisites = [
-        Prerequisite(text=c.text, source_ids=c.source_ids) for c in guide.prerequisites[:3]
-    ]
+    # What the student should bring, not what the sources found: the guide's own "prerequisites"
+    # claims are conditions of the vulnerability and would give away the answers to the tasks.
+    prerequisites = [Prerequisite(text=text) for text in STUDY_PREREQUISITES]
     if any(t.kind == "reproduce" for t in tasks):
         prerequisites.append(Prerequisite(text=LAB_PREREQUISITE))
     return Challenge(

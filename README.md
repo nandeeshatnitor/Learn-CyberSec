@@ -7,7 +7,7 @@ reproduce it in an authorised local lab, and how to fix it.
 > **Educational use only.** Only test systems you own or have explicit written permission to
 > test. Everything from external sources is treated as untrusted input.
 
-## Status: Phase 2 (source-cited learning guides)
+## Status: Phase 3 (interactive learning)
 
 You can open the site, search for a CVE (by ID, part of an ID, keyword, product or vendor), open
 it, and see metadata retrieved from **NVD**, **MITRE / CVE Program** and the **CISA KEV
@@ -25,8 +25,16 @@ guide says so instead of guessing. Retrieved web content is treated strictly as 
 executed, and a language model (optional) only rewrites evidence that is then re-checked in code. See
 [docs/research.md](docs/research.md).
 
-**Not implemented yet (later phases):** hints, sandbox labs, users and progress. Those sections show
-as "Not available". See [docs/roadmap.md](docs/roadmap.md) and [docs/providers.md](docs/providers.md).
+**Interactive learning (phase 3).** Instead of reading the solution, press **Start learning session** and
+work through it at `/learn/CVE-…`: objectives and progress on the left, the current task in the middle,
+the AI tutor, hints and sources on the right. Tasks: identify the vulnerable component and input, reproduce
+the documented behaviour in a lab, explain why it happens, identify the remediation. Answer in your own
+words and get feedback that never hands you the answer; ask for up to three progressively more explicit
+hints (a small, configurable score cost) or the solution; ask the tutor, whose answers cite their sources
+and say so when the sources are silent. See [docs/learning.md](docs/learning.md).
+
+**Not implemented yet (later phases):** sandbox labs and user accounts (learners are anonymous, identified
+by a cookie). Those parts show as "Not available". See [docs/roadmap.md](docs/roadmap.md) and [docs/providers.md](docs/providers.md).
 
 > **Guides work without an API key.** With no `ANTHROPIC_API_KEY` the guide is assembled from
 > verbatim excerpts of the sources. Set the key (backend/worker only) for model-written guides.
@@ -47,6 +55,7 @@ backend/          FastAPI, Pydantic, SQLAlchemy, Alembic
   app/cache/        Redis cache, sliding-window rate limiter, in-process fallbacks
   app/repositories/ database access
   app/models/       ORM models       app/schemas/  normalised, provider-independent schemas
+  app/learning/     interactive challenge, answer rubric, scoring, AI tutor
   app/research/     research pipeline: discovery, safe fetching, extraction, screening, synthesis, validation
   app/workers/      RQ queue, research job and worker entry point
 services/         future standalone services (see services/README.md)
@@ -133,6 +142,7 @@ REDIS_TEST_URL=redis://:pass@localhost:6379/0 make test-backend
 | POST | `/api/cves/{cve_id}/research` | Start (or join, or reuse) learning-guide research. Body `{"refresh": false}`. 202 queued, 200 joined/reused, 404 unknown CVE, 429 per-client or daily limit, 503 disabled or queue down. |
 | GET | `/api/cves/{cve_id}/research/status` | `not_started / queued / researching / synthesizing / ready / failed`, counts, versions, error. Poll this. |
 | GET | `/api/cves/{cve_id}/research` | The stored guide (every claim with evidence level and citations), sources used, and what happened to every other source. 404 until a guide exists. |
+| POST/GET | `/api/learning…` | Learning sessions: create/start/complete, hints (`GET …/hints`, `POST …/hints`), answers, solution, AI tutor. Needs the `X-Learner-Token` header (set by the web app from a cookie). See [docs/learning.md](docs/learning.md#api). |
 | GET | `/api/sources/{source_id}` | Stored source by UUID. |
 
 Response shape (abridged):
