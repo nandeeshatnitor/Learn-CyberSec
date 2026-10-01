@@ -55,6 +55,15 @@ describe("hands-on lab in the learning workspace", () => {
     expect(within(card).getByRole("button", { name: "Start a fresh lab" })).toBeInTheDocument();
   });
 
+  it("keeps an earlier version's progress visible but does not offer to start it", async () => {
+    const sandbox = makeFakeSandbox({ session: sessionLabs(2, { retired: true, last_instance_id: INSTANCE_ID }) });
+    await openLesson(sandbox);
+    const card = await screen.findByTestId("labs-card");
+    expect(within(card).getByTestId("lab-retired")).toHaveTextContent(/earlier version/i);
+    expect(within(card).getByTestId("lab-progress-text")).toHaveTextContent("2 of 2 objectives verified");
+    expect(within(card).queryByRole("button", { name: /Start/ })).toBeNull();
+  });
+
   it("lets the student resume a lab that is still running", async () => {
     const sandbox = makeFakeSandbox({ session: sessionLabs(1, { instance_id: INSTANCE_ID, last_instance_id: INSTANCE_ID }) });
     await openLesson(sandbox);

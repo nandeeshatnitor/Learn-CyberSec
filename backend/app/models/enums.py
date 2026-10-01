@@ -102,3 +102,43 @@ LAB_TRANSITIONS: dict[LabStatus, frozenset[LabStatus]] = {
     LabStatus.STOPPED: frozenset(),
     LabStatus.FAILED: frozenset(),
 }
+
+
+class CandidateStatus(enum.StrEnum):
+    """Where a candidate lab is in the pipeline. Only a human can move it to APPROVED."""
+
+    GENERATING = "generating"
+    GENERATION_FAILED = "generation_failed"
+    SPEC_ONLY = "spec_only"  # a specification, but no safe automated lab could be generated
+    BUILDING = "building"
+    BUILD_FAILED = "build_failed"
+    VALIDATING = "validating"
+    VALIDATION_FAILED = "validation_failed"  # automated or security validation failed
+    AWAITING_REVIEW = "awaiting_review"  # every automated gate passed; a human must decide
+    CHANGES_REQUESTED = "changes_requested"
+    REJECTED = "rejected"
+    APPROVED = "approved"  # published as an immutable lab version
+
+
+class StageStatus(enum.StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    PASSED = "passed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class VersionStatus(enum.StrEnum):
+    PUBLISHED = "published"  # offered to students
+    SUPERSEDED = "superseded"  # a newer version is offered; still resolves for existing records
+    WITHDRAWN = "withdrawn"  # taken down by an admin; still resolves for existing records
+
+
+# Candidates the pipeline is still working on (the job owns them).
+WORKING_CANDIDATE_STATUSES = (
+    CandidateStatus.GENERATING,
+    CandidateStatus.BUILDING,
+    CandidateStatus.VALIDATING,
+)
+# A reviewer may act only on these.
+REVIEWABLE_CANDIDATE_STATUSES = (CandidateStatus.AWAITING_REVIEW,)

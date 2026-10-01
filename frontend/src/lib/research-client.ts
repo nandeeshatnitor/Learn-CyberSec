@@ -42,6 +42,7 @@ function problemFrom(status: number, body: unknown, retryAfter: string | null): 
   const code = typeof error.code === "string" ? error.code : "";
   const message = typeof error.message === "string" ? error.message : "";
   if (status === 404) return { kind: "not_found", message: message || "Not found." };
+  if (status === 401) return { kind: "unauthorized", message: "Please sign in." };
   if (status === 403) return { kind: "forbidden", message: "This request was refused." };
   if (status === 422) {
     // "invalid_input" messages are written for the user; framework validation errors are not.
@@ -56,6 +57,9 @@ function problemFrom(status: number, body: unknown, retryAfter: string | null): 
       message: message || "Too many requests. Please try again later.",
       retryAfter: Number.isFinite(seconds) && seconds > 0 ? seconds : undefined,
     };
+  }
+  if (code === "labgen_disabled" || code === "admin_disabled") {
+    return { kind: "disabled", message: "The review interface is not enabled on this server." };
   }
   if (code === "sandbox_disabled") return { kind: "disabled", message: "Labs are not enabled on this server." };
   if (code === "research_disabled") return { kind: "disabled", message: "Learning-guide generation is turned off on this server." };

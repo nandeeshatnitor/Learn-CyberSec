@@ -81,6 +81,8 @@ export type LabProgressView = {
   total: number;
   instance_id: string | null;
   last_instance_id: string | null;
+  /** An older version of a lab that has since been replaced: the record stays, no new start. */
+  retired?: boolean;
 };
 
 export type SessionLabs = { session_id: string; labs: LabProgressView[] };

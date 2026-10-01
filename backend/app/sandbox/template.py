@@ -11,7 +11,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
@@ -49,6 +49,38 @@ def safe_request_path(value: str) -> str:
         raise ValueError("must be a plain path such as /page?x=1 (no host, scheme or spaces)")
     return value
 
+
+_HEADER_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9-]{0,39}$")
+_HEADER_VALUE = re.compile(r"^[\x20-\x7e]{0,200}$")
+
+
+def safe_header_name(value: str) -> str:
+    """A header name a verification may send. Raises ValueError."""
+    if not _HEADER_NAME.match(value) or value.lower() in _FORBIDDEN_HEADERS:
+        raise ValueError("not an allowed header name")
+    return value
+
+
+def safe_header_value(value: str) -> str:
+    """A header value: printable ASCII only (no CR/LF, so no header injection), at most 200 chars."""
+    if not _HEADER_VALUE.match(value):
+        raise ValueError("header values are printable ASCII, at most 200 characters")
+    return value
+
+
+# Headers a definition may never set: they would change how the request is routed or framed.
+_FORBIDDEN_HEADERS = frozenset(
+    {
+        "host",
+        "content-length",
+        "transfer-encoding",
+        "connection",
+        "upgrade",
+        "te",
+        "trailer",
+        "cookie",
+    }
+)
 
 RequestPath = Annotated[str, Field(min_length=1, max_length=MAX_PATH_CHARS)]
 
@@ -93,13 +125,46 @@ class Expectation(_Model):
     """A request the verifier sends to the running lab and what a healthy answer looks like."""
 
     path: RequestPath
+    headers: dict[str, str] = Field(default_factory=dict, max_length=3)
     status_in: list[int] = Field(default_factory=lambda: [200], min_length=1, max_length=8)
     body_contains: str | None = Field(default=None, max_length=200)
+    body_not_contains: str | None = Field(default=None, max_length=200)
 
     @field_validator("path")
     @classmethod
     def _path(cls, value: str) -> str:
         return safe_request_path(value)
+
+    @field_validator("headers")
+    @classmethod
+    def _headers(cls, value: dict[str, str]) -> dict[str, str]:
+        for name, item in value.items():
+            safe_header_name(name)
+            safe_header_value(item)
+        return value
+
+
+class HeaderAttack(_Model):
+    """An attack request whose payload travels in a header."""
+
+    path: RequestPath
+    header: str
+    value: str = Field(max_length=200)
+
+    @field_validator("path")
+    @classmethod
+    def _path(cls, value: str) -> str:
+        return safe_request_path(value)
+
+    @field_validator("header")
+    @classmethod
+    def _header(cls, value: str) -> str:
+        return safe_header_name(value)
+
+    @field_validator("value")
+    @classmethod
+    def _value(cls, value: str) -> str:
+        return safe_header_value(value)
 
 
 class _Check(_Model):
@@ -117,6 +182,20 @@ class PayloadReplayCheck(_Check):
     kind: Literal["payload_replay"]
     input_label: str = Field(default="Request path", max_length=60)
     input_hint: str = Field(default="/page?name=...", max_length=120)
+    # When set, the student's input is the *value of this header* on a GET to `path` (for flaws
+    # that are triggered through a header, not the URL); otherwise the input is the request path.
+    header: str | None = None
+    path: RequestPath = "/"
+
+    @field_validator("header")
+    @classmethod
+    def _header(cls, value: str | None) -> str | None:
+        return safe_header_name(value) if value is not None else None
+
+    @field_validator("path")
+    @classmethod
+    def _path(cls, value: str) -> str:
+        return safe_request_path(value)
 
 
 class RegressionCheck(_Check):
@@ -126,6 +205,7 @@ class RegressionCheck(_Check):
     kind: Literal["regression"]
     restart: bool = True
     block_paths: list[RequestPath] = Field(default_factory=list, max_length=40)
+    block_headers: list[HeaderAttack] = Field(default_factory=list, max_length=20)
     replay_from: list[str] = Field(default_factory=list, max_length=4)
     keep_working: list[Expectation] = Field(min_length=1, max_length=20)
 
@@ -320,6 +400,19 @@ def check_limits(template: LabTemplate, limits: PlatformLimits) -> None:
         raise TemplateError("; ".join(problems))
 
 
+class CatalogLike(Protocol):
+    """What the sandbox needs from a catalogue of labs (the repository's labs, or those plus the
+    approved versions stored in the database)."""
+
+    def get(self, lab_id: str) -> LabTemplate | None: ...
+
+    def all(self) -> list[LabTemplate]: ...
+
+    def is_offered(self, lab_id: str) -> bool: ...
+
+    def matching(self, cve_id: str | None, cwe_ids: list[str]) -> list[LabTemplate]: ...
+
+
 @dataclass
 class LabCatalog:
     """The validated set of labs. A broken definition is reported and skipped, never started."""
@@ -352,6 +445,12 @@ class LabCatalog:
 
     def get(self, lab_id: str) -> LabTemplate | None:
         return self.labs.get(lab_id)
+
+    def all(self) -> list[LabTemplate]:
+        return list(self.labs.values())
+
+    def is_offered(self, lab_id: str) -> bool:
+        return lab_id in self.labs
 
     def matching(self, cve_id: str | None, cwe_ids: list[str]) -> list[LabTemplate]:
         """Labs for a CVE: those written for it, then those for a weakness class it has."""

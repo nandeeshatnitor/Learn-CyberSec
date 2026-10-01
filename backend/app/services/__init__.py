@@ -1,9 +1,11 @@
 from app.services.cve_service import CVEService
 from app.services.errors import (
+    AdminDisabledError,
     ConflictError,
     DomainError,
     InvalidInputError,
     LabCapacityError,
+    LabgenDisabledError,
     LabStartFailedError,
     LearningDisabledError,
     NotFoundError,
@@ -20,6 +22,8 @@ from app.services.research_service import ResearchPolicy, ResearchRunner, Resear
 from app.services.source_service import SourceService
 
 __all__ = [
+    "AdminDisabledError",
+    "LabgenDisabledError",
     "ConflictError",
     "CVEService",
     "DomainError",

@@ -86,6 +86,12 @@ def _text(raw: bytes | str | None) -> str:
     return data[:MAX_OUTPUT_BYTES].decode("utf-8", errors="replace")
 
 
+def _missing(stderr: str) -> bool:
+    """Docker's "it is already gone" answers (the wording differs between versions)."""
+    low = stderr.lower()
+    return "no such" in low or "not found" in low
+
+
 def _tmpfs_arg(mount: TmpfsMount) -> str:
     parts = [_TMPFS_FLAGS, f"size={mount.size_mb}m", f"mode={mount.mode}"]
     if mount.uid is not None:
@@ -208,7 +214,7 @@ class DockerRuntime:
 
     def remove_network(self, name: str) -> None:
         result = self._run(["network", "rm", name], timeout=20)
-        if result.exit_code != 0 and "no such network" not in result.stderr.lower():
+        if result.exit_code != 0 and not _missing(result.stderr):
             raise SandboxError("network_remove_failed", result.stderr[:300])
 
     def run_container(self, spec: ContainerSpec) -> None:
@@ -240,7 +246,7 @@ class DockerRuntime:
 
     def remove_container(self, name: str) -> None:
         result = self._run(["rm", "--force", "--volumes", name], timeout=30)
-        if result.exit_code != 0 and "no such container" not in result.stderr.lower():
+        if result.exit_code != 0 and not _missing(result.stderr):
             raise SandboxError("container_remove_failed", result.stderr[:300])
 
     def exec(

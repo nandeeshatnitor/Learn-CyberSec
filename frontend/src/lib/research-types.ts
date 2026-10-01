@@ -148,7 +148,7 @@ export interface ResearchGuideResponse extends ResearchStatus {
 
 /** Uniform error body returned by the same-origin proxy (and by the backend). */
 export interface ResearchProblem {
-  kind: "not_found" | "invalid" | "rate_limited" | "disabled" | "unavailable" | "forbidden";
+  kind: "not_found" | "invalid" | "rate_limited" | "disabled" | "unavailable" | "forbidden" | "unauthorized";
   message: string;
   retryAfter?: number;
 }

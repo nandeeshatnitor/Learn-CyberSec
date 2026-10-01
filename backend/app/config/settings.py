@@ -3,6 +3,7 @@
 No secrets have defaults here: DATABASE_URL must be provided by the environment.
 """
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
@@ -183,6 +184,26 @@ class Settings(BaseSettings):
     sandbox_terminal_idle_seconds: int = Field(default=600, ge=30, le=7200)
     sandbox_terminal_max_per_instance: int = Field(default=2, ge=1, le=10)
 
+    # --- Candidate-lab pipeline and reviewer administration (phase 5) ---------------------------
+    # Off by default. Generating, building and validating candidates needs the same Docker daemon
+    # as the sandbox; nothing generated is ever offered to students without a human's approval.
+    labgen_enabled: bool = False
+    # Reviewers as "name=<sha256 of their token>" pairs (see scripts/admin_token.py). No reviewers
+    # configured means the admin interface is closed.
+    admin_reviewers: Annotated[dict[str, str], NoDecode] = Field(default_factory=dict)
+    admin_auth_failures_per_minute: int = Field(default=10, ge=1)
+    admin_read_rate_limit_requests: int = Field(default=300, ge=1)  # per minute per client
+    labgen_queue_name: str = Field(default="labgen", pattern=r"^[a-z0-9_-]{1,40}$")
+    labgen_job_timeout_seconds: int = Field(default=1800, ge=60, le=7200)
+    labgen_build_timeout_seconds: int = Field(default=300, ge=30, le=1800)
+    # Base images a generated Dockerfile may start FROM. They must already exist locally: a
+    # build runs with no network, so nothing is ever downloaded for a candidate.
+    labgen_base_images: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["python:3.12-alpine"]
+    )
+    # Let a language model polish the candidate's wording (never its code). Needs the API key.
+    labgen_use_llm: bool = True
+
     @field_validator("redis_url", "nvd_api_key", "anthropic_api_key", "github_token", mode="before")
     @classmethod
     def _empty_secret_is_unset(cls, value: object) -> object:
@@ -192,6 +213,31 @@ class Settings(BaseSettings):
     @classmethod
     def _empty_int_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("admin_reviewers", mode="before")
+    @classmethod
+    def _parse_reviewers(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        pairs: dict[str, str] = {}
+        for item in value.split(","):
+            if not item.strip():
+                continue
+            name, _, digest = item.partition("=")
+            name, digest = name.strip(), digest.strip().lower()
+            if not re.fullmatch(r"[A-Za-z0-9_.-]{1,40}", name) or not re.fullmatch(
+                r"[0-9a-f]{64}", digest
+            ):
+                raise ValueError("ADMIN_REVIEWERS entries must look like name=<sha256 hex>")
+            pairs[name] = digest
+        return pairs
+
+    @field_validator("labgen_base_images", mode="before")
+    @classmethod
+    def _split_base_images(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
     @field_validator("sandbox_allowed_image_prefixes", mode="before")
     @classmethod

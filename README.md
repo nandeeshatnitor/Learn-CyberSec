@@ -7,7 +7,7 @@ reproduce it in an authorised local lab, and how to fix it.
 > **Educational use only.** Only test systems you own or have explicit written permission to
 > test. Everything from external sources is treated as untrusted input.
 
-## Status: Phase 4 (sandboxed labs)
+## Status: Phase 5 (candidate labs and review)
 
 You can open the site, search for a CVE (by ID, part of an ID, keyword, product or vendor), open
 it, and see metadata retrieved from **NVD**, **MITRE / CVE Program** and the **CISA KEV
@@ -42,6 +42,14 @@ host mounts; it can be reset at any time and is deleted when its time runs out. 
 needs a Docker daemon the backend may drive. The demo lab is a path-traversal toy app at `/labs`. See
 [docs/sandbox.md](docs/sandbox.md).
 
+**Candidate labs and review (phase 5).** A controlled pipeline turns a CVE's researched guide into a *candidate* lab:
+a specification (affected software and version, safe objective, tasks, expected behaviour, verification, remediation,
+sources), a minimal toy application rendered from a vetted blueprint (never the vendor's code), an offline build, a
+static security scan, and ten automated checks in the real sandbox. The candidate then waits in **Candidate Labs**
+(`/admin/labs`) for a person to *Approve*, *Reject* or *Request Changes*. Only approved labs reach students, as
+immutable `lab-v1`, `lab-v2`, … versions; learners' records keep pointing at the version they used. Nothing is ever
+deployed automatically. Off by default (`LABGEN_ENABLED`, `ADMIN_REVIEWERS`). See [docs/labgen.md](docs/labgen.md).
+
 **Not implemented yet (later phases):** user accounts (learners are anonymous, identified by a cookie) and labs for
 arbitrary CVEs. See [docs/roadmap.md](docs/roadmap.md) and [docs/providers.md](docs/providers.md).
 
@@ -66,6 +74,7 @@ backend/          FastAPI, Pydantic, SQLAlchemy, Alembic
   app/models/       ORM models       app/schemas/  normalised, provider-independent schemas
   app/learning/     interactive challenge, answer rubric, scoring, AI tutor
   app/research/     research pipeline: discovery, safe fetching, extraction, screening, synthesis, validation
+  app/labgen/       candidate labs: facts, blueprints, spec, security scan, build, validation, publication
   app/sandbox/      sandboxed labs: templates, Docker runtime, network controller, instance manager, cleanup, verifier, terminal gateway
   app/workers/      RQ queue, research job and worker; the lab cleanup worker
 labs/             lab definitions (lab.json + Dockerfile + the intentionally vulnerable toy app) and the isolation-probe image
@@ -130,6 +139,9 @@ make lint        # ruff + eslint
 make typecheck   # mypy + tsc
 make smoke       # against a running stack
 make verify-providers   # against the REAL NVD / MITRE / CISA APIs (needs internet)
+make labgen-worker      # candidate-lab worker (needs Redis + Docker)
+make admin-token NAME=alice # a reviewer token and its ADMIN_REVIEWERS entry
+make test-labgen-docker # candidate pipeline + publication on a REAL Docker daemon
 make test-sandbox-docker # sandbox tests on a REAL Docker daemon (root; builds the lab images; starts containers)
 ```
 
@@ -155,6 +167,7 @@ REDIS_TEST_URL=redis://:pass@localhost:6379/0 make test-backend
 | GET | `/api/cves/{cve_id}/research/status` | `not_started / queued / researching / synthesizing / ready / failed`, counts, versions, error. Poll this. |
 | GET | `/api/cves/{cve_id}/research` | The stored guide (every claim with evidence level and citations), sources used, and what happened to every other source. 404 until a guide exists. |
 | POST/GET | `/api/learning…` | Learning sessions: create/start/complete, hints (`GET …/hints`, `POST …/hints`), answers, solution, AI tutor. Needs the `X-Learner-Token` header (set by the web app from a cookie). See [docs/learning.md](docs/learning.md#api). |
+| `/api/admin/labs…` | | Reviewer-only (`X-Admin-Token`): candidate labs (list, request, review, approve / reject / request changes, regenerate, rebuild) and published versions. Off unless `LABGEN_ENABLED=true`. See [docs/labgen.md](docs/labgen.md). |
 | `/api/sandbox…` | | Sandboxed labs: catalogue, start/reset/stop, verify, isolation check, terminal ticket, lab progress per learning session; plus the lab's web app and the terminal WebSocket. Off unless `SANDBOX_ENABLED=true`. See [docs/sandbox.md](docs/sandbox.md#api). |
 | GET | `/api/sources/{source_id}` | Stored source by UUID. |
 
@@ -197,4 +210,5 @@ exposed to the browser.
 - [Data model](docs/data-model.md)
 - [Security design](docs/security.md)
 - [Sandboxed labs](docs/sandbox.md)
+- [Candidate labs and review](docs/labgen.md)
 - [Roadmap](docs/roadmap.md)

@@ -13,7 +13,11 @@ from typing import Protocol
 
 import httpx2
 
-from app.sandbox.template import safe_request_path
+from app.sandbox.template import safe_header_name, safe_header_value, safe_request_path
+
+# Headers the app proxy forwards from a browser (already filtered by the proxy's allow-list); the
+# verifier's own headers are checked strictly instead.
+_PASS_THROUGH_HEADERS = frozenset({"accept", "accept-language", "content-type"})
 
 
 class AppUnreachable(Exception):
@@ -67,8 +71,12 @@ class HttpxAppTransport:
             raise AppUnreachable("not a lab endpoint")
         try:
             safe_request_path(path)
+            for name, value in (headers or {}).items():
+                if name.lower() not in _PASS_THROUGH_HEADERS:
+                    safe_header_name(name)
+                    safe_header_value(value)
         except ValueError as exc:
-            raise AppUnreachable("not a plain path") from exc
+            raise AppUnreachable("not a plain request") from exc
         try:
             # No environment proxies, no redirects, no cookies: one plain request to the lab.
             with (

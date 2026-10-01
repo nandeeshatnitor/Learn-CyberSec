@@ -80,6 +80,13 @@ JSON in `labs/`, validated like untrusted input. The browser reaches everything 
 (`/api/sandbox`, `/lab-app`) except the terminal WebSocket. Details, isolation findings and deployment:
 [sandbox.md](sandbox.md).
 
+## Candidate labs
+
+`CandidatePipeline` (generate → static scan → build → validate, run by the `labgen` RQ worker) produces a `LabCandidate`
+and stops at `awaiting_review`. `LabPublisher.approve` is the only creator of an immutable `LabVersion`, called only from
+the reviewer API (`/api/admin/labs`, `X-Admin-Token`). `LayeredCatalog` gives the sandbox the repository's labs plus the
+published versions. Details: [labgen.md](labgen.md).
+
 ## Adding services later
 
 `services/` is reserved for standalone deployable units (for example an ingestion worker or a

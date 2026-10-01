@@ -75,3 +75,11 @@ class LabStartFailedError(DomainError):
     """A lab could not be started. The message is one of a fixed set, never runtime output."""
 
     code = "lab_start_failed"
+
+
+class LabgenDisabledError(DomainError):
+    code = "labgen_disabled"
+
+
+class AdminDisabledError(DomainError):
+    code = "admin_disabled"

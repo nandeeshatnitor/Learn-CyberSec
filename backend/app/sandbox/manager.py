@@ -25,7 +25,7 @@ from app.sandbox.network import NetworkController
 from app.sandbox.proxy import AppProxy, ProxyResult
 from app.sandbox.runtime import NetworkInfo, SandboxError
 from app.sandbox.template import (
-    LabCatalog,
+    CatalogLike,
     LabTemplate,
     PayloadReplayCheck,
     RegressionCheck,
@@ -61,7 +61,7 @@ class SandboxManager:
     def __init__(
         self,
         repo: SandboxRepository,
-        catalog: LabCatalog,
+        catalog: CatalogLike,
         instances: InstanceManager,
         networks: NetworkController,
         verifier: Verifier,
@@ -84,7 +84,7 @@ class SandboxManager:
     def labs(self, cve_id: str | None = None) -> list[LabView]:
         self._enabled()
         if cve_id is None:
-            templates = list(self._catalog.labs.values())
+            templates = self._catalog.all()
         else:
             templates = self._catalog.matching(cve_id, self._cwe_lookup(cve_id))
         return [self._lab_view(t) for t in templates]
@@ -261,8 +261,16 @@ class SandboxManager:
         if session is None:
             raise NotFoundError("Learning session not found.")
         templates = self._catalog.matching(session.cve_id, self._cwe_lookup(session.cve_id))
+        offered = {t.id for t in templates}
+        # A version the learner used that is no longer offered (superseded or withdrawn) still
+        # shows their progress, but cannot be started again.
+        retired = [
+            t
+            for lab_id in self._repo.lab_ids_used_in_session(user_id, sid)
+            if lab_id not in offered and (t := self._catalog.get(lab_id)) is not None
+        ]
         progress: list[LabProgressView] = []
-        for template in templates:
+        for template in [*templates, *retired]:
             passed = self._repo.passed_checks(user_id, template.id, sid)
             objectives = [
                 self._objective(c, done=c.id in passed) for c in template.verification.checks
@@ -277,6 +285,7 @@ class SandboxManager:
                     total=len(objectives),
                     instance_id=str(live.id) if live and live.lab_id == template.id else None,
                     last_instance_id=str(latest.id) if latest else None,
+                    retired=template.id not in offered,
                 )
             )
         return SessionLabs(session_id=str(sid), labs=progress)

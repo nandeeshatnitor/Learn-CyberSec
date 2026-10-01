@@ -79,6 +79,17 @@ lab per learner and makes concurrent starts race-free. `lab_verifications` (per 
 progress). `lab_terminal_tickets` (single-use terminal tickets: SHA-256 of the ticket, instance, learner, `expires_at`,
 `used_at`). Lab *definitions* are JSON files in `labs/`, not rows.
 
+### Candidate labs (migration 0006)
+
+`lab_candidates` (one revision of a candidate: `family`, `cve_id`, `revision`, `parent_id`, `status`, per-stage
+`build_status`/`validation_status`/`security_status`, `stage_detail`, the `spec` JSON, generated `files`, `context_hash`,
+`image_tag`/`image_id`, bounded `build_log`, `validation_report`, `security_report`, `guide_run_id`, `generator`,
+`requested_by`, `reviewer`, `reviewed_at`, `review_notes`, `version_id`, a fixed `error_code`; unique per family and
+revision, and a **partial unique index** allows one revision per family in a working state). `lab_reviews` (append-only:
+reviewer, action, from/to status, notes). `lab_versions` (**immutable** published labs `<family>-v<N>`: frozen `spec` and
+`files`, `content_hash`, `image_tag`, `status` published/superseded/withdrawn; content columns are protected by an ORM
+guard and, on PostgreSQL, a trigger).
+
 ## Placeholders (documented only; no tables yet)
 
 | Entity | Intended purpose | Phase |

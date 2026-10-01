@@ -51,6 +51,15 @@ lab-images: ## Build the lab images locally (never pulled): the demo lab and the
 sandbox-worker: ## Run the lab cleanup worker (needs SANDBOX_ENABLED=true and a Docker daemon it may drive)
 	cd backend && ../$(PY) -m app.workers.sandbox_worker
 
+labgen-worker: ## Run the candidate-lab worker (builds and tests candidates; needs LABGEN_ENABLED=true, Redis and a Docker daemon it may drive)
+	cd backend && ../$(PY) -m app.workers.labgen_worker
+
+admin-token: ## Make a reviewer token: make admin-token NAME=alice (prints the ADMIN_REVIEWERS entry to configure)
+	@$(PY) scripts/admin_token.py "$(NAME)"
+
+test-labgen-docker: lab-images ## Run the candidate pipeline + publication tests against a REAL Docker daemon (root; needs python:3.12-alpine locally)
+	cd backend && SANDBOX_TEST_DOCKER=1 ../$(PY) -m pytest tests/labgen/test_pipeline_docker.py
+
 test-sandbox-docker: lab-images ## Run the sandbox tests against a REAL Docker daemon (root; starts containers, edits iptables)
 	cd backend && SANDBOX_TEST_DOCKER=1 ../$(PY) -m pytest tests/sandbox/test_docker_integration.py
 

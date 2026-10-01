@@ -15,6 +15,9 @@ from app.models.enums import (
     ACTIVE_RESEARCH_STATUSES,
     LAB_TRANSITIONS,
     LIVE_LAB_STATUSES,
+    REVIEWABLE_CANDIDATE_STATUSES,
+    WORKING_CANDIDATE_STATUSES,
+    CandidateStatus,
     DataOrigin,
     LabStatus,
     LearningStatus,
@@ -22,6 +25,15 @@ from app.models.enums import (
     ResearchStatus,
     SourceStatus,
     SourceType,
+    StageStatus,
+    VersionStatus,
+)
+from app.models.labgen import (
+    IMMUTABLE_VERSION_COLUMNS,
+    ImmutableVersionError,
+    LabCandidate,
+    LabReview,
+    LabVersion,
 )
 from app.models.learning import (
     LearningAttempt,
@@ -35,6 +47,16 @@ from app.models.sandbox import LabInstance, LabVerification, TerminalTicket
 from app.models.source import Source
 
 __all__ = [
+    "IMMUTABLE_VERSION_COLUMNS",
+    "REVIEWABLE_CANDIDATE_STATUSES",
+    "WORKING_CANDIDATE_STATUSES",
+    "CandidateStatus",
+    "ImmutableVersionError",
+    "LabCandidate",
+    "LabReview",
+    "LabVersion",
+    "StageStatus",
+    "VersionStatus",
     "ACTIVE_LEARNING_STATUSES",
     "ACTIVE_RESEARCH_STATUSES",
     "CVE",

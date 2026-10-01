@@ -1,6 +1,7 @@
 """Dependency wiring: builds services from request-scoped and process-wide resources."""
 
 import hashlib
+import hmac
 import re
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
@@ -19,8 +20,12 @@ from app.database import get_db
 from app.database.redis import get_redis
 from app.database.session import get_session_factory
 from app.integrations.registry import ProviderRegistry, build_registry
+from app.labgen.catalog import LayeredCatalog, PublishedLabs
+from app.labgen.pipeline import CandidatePipeline
+from app.labgen.publish import STUDENT_IMAGE_PREFIX, LabPublisher
 from app.repositories import (
     CVERepository,
+    LabgenRepository,
     LearningRepository,
     ResearchRepository,
     SandboxRepository,
@@ -35,7 +40,7 @@ from app.sandbox.manager import SandboxManager
 from app.sandbox.network import NetworkController
 from app.sandbox.proxy import AppProxy
 from app.sandbox.runtime import ContainerRuntime
-from app.sandbox.template import LabCatalog
+from app.sandbox.template import LabCatalog, PlatformLimits
 from app.sandbox.terminal import TerminalGateway
 from app.sandbox.verifier import Verifier
 from app.services import (
@@ -47,7 +52,12 @@ from app.services import (
     ResearchService,
     SourceService,
 )
-from app.services.errors import RateLimitedError, UnauthorizedError
+from app.services.errors import (
+    AdminDisabledError,
+    LabgenDisabledError,
+    RateLimitedError,
+    UnauthorizedError,
+)
 from app.utils.client_ip import client_ip, parse_networks
 from app.workers.queue import JobQueue, build_job_queue
 
@@ -231,12 +241,30 @@ def _service_ports(settings: Settings) -> tuple[int, ...]:
     return tuple(sorted(ports))
 
 
+def student_limits(settings: Settings) -> PlatformLimits:
+    """Limits a published lab is re-checked against every time it is loaded: the platform's, and
+    only images the publisher itself tagged."""
+    return PlatformLimits(
+        max_cpus=settings.sandbox_max_cpus,
+        max_memory_mb=settings.sandbox_max_memory_mb,
+        max_pids=settings.sandbox_max_pids,
+        max_tmpfs_mb=settings.sandbox_max_tmpfs_mb,
+        max_timeout_minutes=settings.sandbox_max_timeout_minutes,
+        allowed_image_prefixes=(STUDENT_IMAGE_PREFIX,),
+    )
+
+
 def build_sandbox_manager(db: Session, limiter: RateLimiter, settings: Settings) -> SandboxManager:
     """Wire the sandbox components around one database session (also used by the cleanup worker)."""
     config = get_sandbox_config()
     runtime = get_sandbox_runtime()
     transport = get_app_transport()
-    catalog = get_lab_catalog()
+    catalog = LayeredCatalog(
+        get_lab_catalog(),
+        PublishedLabs(LabgenRepository(db), student_limits(settings))
+        if settings.labgen_enabled
+        else None,
+    )
     repo = SandboxRepository(db)
     networks = NetworkController(
         runtime,
@@ -292,6 +320,67 @@ def enforce_sandbox_limit(client: ClientKey, infra: InfraDep, settings: AppSetti
         raise RateLimitedError("Too many requests. Please slow down.", decision.retry_after)
 
 
+# --- Reviewer administration (phase 5) ---------------------------------------------------------
+@dataclass(frozen=True)
+class AdminReviewer:
+    name: str
+
+
+def get_admin_reviewer(
+    client: ClientKey,
+    infra: InfraDep,
+    settings: AppSettings,
+    x_admin_token: Annotated[str | None, Header(max_length=200)] = None,
+) -> AdminReviewer:
+    """Identify a reviewer by their bearer token (only its sha256 is configured, see
+    `scripts/admin_token.py`). Closed unless the feature is on and at least one reviewer exists.
+
+    The comparison is constant-time and visits every reviewer; wrong tokens are rate limited per
+    client (the token itself is a 256-bit random value, so this is defence in depth).
+    """
+    if not settings.labgen_enabled:
+        raise LabgenDisabledError("Candidate labs are not enabled on this deployment.")
+    if not settings.admin_reviewers:
+        raise AdminDisabledError("The review interface is not configured.")
+    found: str | None = None
+    if x_admin_token:
+        digest = hashlib.sha256(x_admin_token.encode()).hexdigest()
+        for name, expected in settings.admin_reviewers.items():
+            if hmac.compare_digest(digest, expected) and found is None:
+                found = name
+    if found is None:
+        decision = infra.limiter.acquire(
+            f"admin-auth-fail:{client}", settings.admin_auth_failures_per_minute, 60
+        )
+        if not decision.allowed:
+            raise RateLimitedError("Too many failed attempts.", decision.retry_after)
+        raise UnauthorizedError("A valid reviewer token is required.")
+    decision = infra.limiter.acquire(f"admin:{client}", settings.admin_read_rate_limit_requests, 60)
+    if not decision.allowed:
+        raise RateLimitedError("Too many requests. Please slow down.", decision.retry_after)
+    return AdminReviewer(found)
+
+
+AdminDep = Annotated[AdminReviewer, Depends(get_admin_reviewer)]
+
+
+def get_labgen_repository(db: DbSession) -> LabgenRepository:
+    return LabgenRepository(db)
+
+
+def get_labgen_pipeline(db: DbSession, settings: AppSettings) -> CandidatePipeline:
+    """The API only creates and re-queues candidates: it needs no Docker (the worker builds)."""
+    from app.labgen.factory import build_pipeline
+
+    return build_pipeline(db, settings, with_validator=False)
+
+
+def get_labgen_publisher(db: DbSession, settings: AppSettings) -> LabPublisher:
+    from app.labgen.factory import build_publisher
+
+    return build_publisher(db, settings)
+
+
 def get_source_service(db: DbSession) -> SourceService:
     return SourceService(SourceRepository(db))
 
@@ -310,3 +399,6 @@ SandboxManagerDep = Annotated[SandboxManager, Depends(get_sandbox_manager)]
 SandboxScopeDep = Annotated[SandboxScope, Depends(get_sandbox_scope)]
 TerminalGatewayDep = Annotated[TerminalGateway, Depends(get_terminal_gateway)]
 HealthServiceDep = Annotated[HealthService, Depends(get_health_service)]
+LabgenRepoDep = Annotated[LabgenRepository, Depends(get_labgen_repository)]
+LabgenPipelineDep = Annotated[CandidatePipeline, Depends(get_labgen_pipeline)]
+LabgenPublisherDep = Annotated[LabPublisher, Depends(get_labgen_publisher)]

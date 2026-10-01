@@ -223,6 +223,15 @@ class SandboxRepository:
             found.setdefault(row.check_id, row)
         return found
 
+    def lab_ids_used_in_session(self, user_id: str, session_id: uuid.UUID) -> list[str]:
+        """Every lab (version) the learner started inside a session, oldest first."""
+        stmt = (
+            select(LabInstance.lab_id)
+            .where(LabInstance.user_id == user_id, LabInstance.session_id == session_id)
+            .order_by(LabInstance.created_at.asc())
+        )
+        return list(dict.fromkeys(self._session.execute(stmt).scalars()))
+
     def latest_instance_for_session(
         self, user_id: str, session_id: uuid.UUID, lab_id: str
     ) -> LabInstance | None:

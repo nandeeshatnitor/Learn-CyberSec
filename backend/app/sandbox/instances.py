@@ -31,7 +31,7 @@ from app.sandbox.runtime import (
     TmpfsMount,
     audit_container,
 )
-from app.sandbox.template import LabCatalog, LabTemplate
+from app.sandbox.template import CatalogLike, LabTemplate
 from app.services.errors import (
     ConflictError,
     LabCapacityError,
@@ -67,7 +67,7 @@ class InstanceManager:
         repo: SandboxRepository,
         runtime: ContainerRuntime,
         networks: NetworkController,
-        catalog: LabCatalog,
+        catalog: CatalogLike,
         transport: AppTransport,
         config: SandboxConfig,
         limiter: RateLimiter,
@@ -102,7 +102,9 @@ class InstanceManager:
         charge: bool = True,
     ) -> LabInstance:
         template = self._catalog.get(lab_id)
-        if template is None:
+        # Only versions that are currently offered can be *started*; older ones still resolve for
+        # existing records (instances, verified objectives) but are not offered again.
+        if template is None or not self._catalog.is_offered(lab_id):
             raise NotFoundError("Lab not found.")
         if session_id is not None and self._repo.learning_session(session_id, user_id) is None:
             raise NotFoundError("Learning session not found.")
@@ -316,7 +318,13 @@ class InstanceManager:
 
     def container_spec(self, row: LabInstance, template: LabTemplate) -> ContainerSpec:
         """The exact container for an instance. The lab's own kill-switch wraps its start command."""
-        expires = int(as_utc(row.expires_at).timestamp()) + self._config.grace_seconds
+        return self.container_spec_for(row, template, self._config)
+
+    @staticmethod
+    def container_spec_for(
+        row: LabInstance, template: LabTemplate, config: SandboxConfig
+    ) -> ContainerSpec:
+        expires = int(as_utc(row.expires_at).timestamp()) + config.grace_seconds
         r = template.resources
         tmpfs = tuple(
             TmpfsMount(
@@ -337,7 +345,7 @@ class InstanceManager:
                 "timeout",
                 "-s",
                 "KILL",
-                str(row.lease_seconds + self._config.grace_seconds),
+                str(row.lease_seconds + config.grace_seconds),
                 *template.startup_command,
             ),
             user=template.user,

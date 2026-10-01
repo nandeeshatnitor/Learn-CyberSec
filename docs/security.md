@@ -54,6 +54,20 @@ Full design in [learning.md](learning.md). Controls and where they are tested:
 | Browser → backend | Same-origin route handlers only, fixed path/method allow-list (no traversal), cross-site POSTs refused, request bodies re-serialised and size-capped, only a sanitised `X-Forwarded-For` and the learner token forwarded, fixed error fields, unexpected statuses become a generic 503. |
 | Cost and abuse | Tutor questions limited per session and per client; sessions per client per hour; learning endpoints have their own read budget. |
 
+## Phase 5: candidate labs and review
+
+Full design in [labgen.md](labgen.md). Controls (tested in `backend/tests/labgen/`, `frontend/tests/admin-*`):
+
+| Concern | Control |
+| --- | --- |
+| Automatic deployment of generated environments | Impossible by construction: jobs end in `awaiting_review`; `approve` is reachable only from an authenticated reviewer's request and re-checks every gate. |
+| LLM- or source-written code | None. Labs are rendered from vetted blueprints; parameters are re-validated and embedded as literals; an LLM may only polish two short strings, which are validated and discarded on any doubt. Source text is data. |
+| Copying vendor code or running documented images | Never; recorded for the reviewer, not used. |
+| Hostile or mistaken candidate | Allow-list static scan, offline build (`--network none`), validation in the real sandbox with the isolation proof and a runtime container audit; reviewer reads the files. |
+| Tampering after validation | Context hash (files), image label and id re-checked at approval; content hash of a published version re-checked on every load; ORM guard and PostgreSQL trigger refuse edits. |
+| Students reaching unapproved labs | Not in the catalogue; `start` requires the offered version; candidate images use a prefix students' limits refuse. |
+| Reviewer access | Per-reviewer token, only SHA-256 hashes configured, constant-time comparison, failure rate limit, HttpOnly SameSite=Strict cookie, allow-listed same-origin proxy, closed unless enabled and configured, `noindex`. |
+
 ## Phase 4: sandboxed labs
 
 Full design, measurements and deployment requirements in [sandbox.md](sandbox.md). Controls and where they are tested
@@ -107,6 +121,8 @@ host/VM or rootless daemon; never expose the socket to an internet-facing contai
   a learning exercise, not for anything sensitive; add real accounts before storing more than progress.
 * Answer checking is keyword/concept matching (see [learning.md](learning.md#answer-checking)); it can
   misjudge unusual phrasing in both directions.
+* **Candidate-lab approval is a human judgement** over generated files; the automated gates reduce mistakes but do not
+  replace reading them. Reviewer tokens do not expire. See [labgen.md](labgen.md#known-limitations).
 * **Sandboxed labs are only as isolated as the host kernel and Docker daemon they run on.** See [sandbox.md](sandbox.md#known-limitations).
 * Phase 2 has not been run against the live web or the live Anthropic API in development (no network
   or key); it is tested with mock transports and fake models.

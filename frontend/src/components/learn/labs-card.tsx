@@ -55,6 +55,11 @@ function LabsCardBody({ labs, sessionId, cveId }: { labs: SessionLabs; sessionId
           return (
             <section key={entry.lab.id} className="space-y-2" data-testid="lab-entry" aria-label={entry.lab.title}>
               <h3 className="text-sm font-medium">{entry.lab.title}</h3>
+              {entry.retired && (
+                <p className="text-xs text-muted-foreground" data-testid="lab-retired">
+                  An earlier version of this lab, kept so your progress stays accurate. A newer version replaces it.
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">{entry.lab.summary}</p>
               <div
                 role="progressbar"
@@ -89,7 +94,7 @@ function LabsCardBody({ labs, sessionId, cveId }: { labs: SessionLabs; sessionId
                 <Button asChild size="sm">
                   <Link href={`/lab/${entry.instance_id}${from}`}>Resume lab</Link>
                 </Button>
-              ) : (
+              ) : entry.retired ? null : (
                 <Button size="sm" onClick={() => void start(entry.lab.id)} disabled={busy !== null}>
                   {busy === entry.lab.id && <Loader2 aria-hidden className="size-3.5 animate-spin" />}
                   {entry.last_instance_id ? "Start a fresh lab" : "Start lab"}

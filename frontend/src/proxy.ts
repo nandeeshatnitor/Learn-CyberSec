@@ -27,15 +27,19 @@ export function proxy(request: NextRequest) {
       ? "/api/learning/invalid"
       : path.startsWith("/api/sandbox")
         ? "/api/sandbox/invalid"
-        : path.startsWith("/api/")
-          ? "/api/cves/invalid/research/status"
-          : path.startsWith("/learn/")
-            ? "/learn/invalid"
-            : path.startsWith("/lab-app/")
-              ? "/lab-app/invalid/invalid"
-              : path.startsWith("/lab/")
-                ? "/lab/invalid"
-                : "/cves/invalid";
+        : path.startsWith("/api/admin")
+          ? "/api/admin/labs/invalid"
+          : path.startsWith("/api/")
+            ? "/api/cves/invalid/research/status"
+            : path.startsWith("/admin/")
+              ? "/admin/labs/invalid"
+              : path.startsWith("/learn/")
+                ? "/learn/invalid"
+                : path.startsWith("/lab-app/")
+                  ? "/lab-app/invalid/invalid"
+                  : path.startsWith("/lab/")
+                    ? "/lab/invalid"
+                    : "/cves/invalid";
     return NextResponse.rewrite(new URL(target, request.url));
   }
   const response = NextResponse.next();
@@ -49,6 +53,7 @@ export function proxy(request: NextRequest) {
       }),
     );
     for (const { key, value } of SECURITY_HEADERS) response.headers.set(key, value);
+    if (path.startsWith("/admin")) response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
   return response;
 }
@@ -58,6 +63,7 @@ export const config = {
     "/api/cves/:path*",
     "/api/learning/:path*",
     "/api/sandbox/:path*",
+    "/api/admin/:path*",
     "/lab-app/:path*",
     // every page (not Next's own assets, the API handlers or the icon)
     "/((?!api/|_next/|icon.svg|favicon.ico).*)",

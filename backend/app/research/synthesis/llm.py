@@ -171,6 +171,13 @@ class AnthropicStructuredLLM:
         parsed, model, _ = self._with_retry(system, user, TutorDraft)
         return TutorResult(draft=parsed, model=model)
 
+    def generate_labtext(self, *, system: str, user: str) -> Any:
+        """Short wording for a candidate lab (schema lives with the generator; imported lazily)."""
+        from app.labgen.generate import LabTextDraft, LabTextResult
+
+        parsed, model, _ = self._with_retry(system, user, LabTextDraft)
+        return LabTextResult(draft=parsed, model=model)
+
     def _with_retry(self, system: str, user: str, schema: type[_T]) -> tuple[_T, str, Any]:
         try:
             return self._generate_once(system, user, schema)

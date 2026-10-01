@@ -130,6 +130,7 @@ class LabProgressView(_Model):
     total: int
     instance_id: str | None  # the learner's live lab for this session, if any
     last_instance_id: str | None
+    retired: bool = False  # an older version: the learner's record stays, it cannot be started
 
 
 class SessionLabs(_Model):

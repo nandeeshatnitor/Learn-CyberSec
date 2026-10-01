@@ -10,10 +10,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.schemas import ErrorBody, ErrorResponse
 from app.services import (
+    AdminDisabledError,
     ConflictError,
     DomainError,
     InvalidInputError,
     LabCapacityError,
+    LabgenDisabledError,
     LabStartFailedError,
     LearningDisabledError,
     NotFoundError,
@@ -41,6 +43,8 @@ _DOMAIN_STATUS = {
     SandboxDisabledError: 503,
     LabCapacityError: 503,
     LabStartFailedError: 502,
+    LabgenDisabledError: 503,
+    AdminDisabledError: 503,
 }
 
 
