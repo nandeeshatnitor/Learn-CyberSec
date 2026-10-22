@@ -1,0 +1,24 @@
+# Render Blueprint: free-tier API. Postgres is external (Neon), the frontend is on Vercel.
+# No Redis/worker/Docker daemon on the free tier, so research jobs run as threads in the API
+# process (RESEARCH_JOB_BACKEND=auto) and the sandboxed labs stay off.
+services:
+  - type: web
+    name: cve-learning-api
+    runtime: docker
+    plan: free
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /api/health
+    # Free tier has no pre-deploy hook, so migrate on every boot (alembic is idempotent).
+    dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers"
+    envVars:
+      - key: DATABASE_URL
+        sync: false # paste the Neon URL, scheme postgresql+psycopg://
+      - key: ENVIRONMENT
+        value: production
+      - key: SANDBOX_ENABLED
+        value: "false"
+      - key: LABGEN_ENABLED
+        value: "false"
+      - key: ANTHROPIC_API_KEY
+        sync: false # optional; without it guides quote the sources
