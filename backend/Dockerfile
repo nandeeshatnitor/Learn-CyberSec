@@ -13,6 +13,7 @@ RUN pip install .
 
 COPY alembic.ini ./
 COPY alembic ./alembic
+COPY start-render.sh ./
 
 # Run as an unprivileged user.
 RUN useradd --system --uid 10001 --no-create-home appuser

@@ -10,7 +10,7 @@ services:
     dockerfilePath: ./backend/Dockerfile
     healthCheckPath: /api/health
     # Free tier has no pre-deploy hook, so migrate on every boot (alembic is idempotent).
-    dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers"
+    dockerCommand: sh start-render.sh
     envVars:
       - key: DATABASE_URL
         sync: false # paste the Neon URL, scheme postgresql+psycopg://
